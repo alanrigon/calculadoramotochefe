@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Gerar Orçamento - Moto Chefe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/webp" href="moto-chefe-maringa2-19.webp" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  </head>
+  <body id="pagina-orcamento">
+    <div class="app-container">
+      <aside class="brand-panel">
+        <div class="logo-placeholder">
+          <!-- Espaço para inserir a logo -->
+          <img src="moto-chefe-maringa2-19.webp" alt="Logo Moto Chefe" class="logo-img" />
+        </div>
+        <div class="brand-text">
+          <h1>Moto Chefe</h1>
+          <p>Orçamento</p>
+        </div>
+      </aside>
+
+      <main class="content-panel">
+        <header class="page-header">
+          <h2>Gerar Orçamento</h2>
+          <p>Preencha os dados do cliente e gere o PDF do orçamento.</p>
+        </header>
+
+        <section class="card grid-2">
+          <div>
+            <h3>Dados do Cliente</h3>
+            <div class="field-group">
+              <label for="cliente-nome">Nome do cliente</label>
+              <input type="text" id="cliente-nome" placeholder="Nome completo" />
+            </div>
+            <div class="field-group">
+              <label for="cliente-contato">Telefone / WhatsApp</label>
+              <input type="tel" id="cliente-contato" placeholder="(00) 00000-0000" />
+            </div>
+            <div class="field-group">
+              <label for="observacoes">Observações</label>
+              <textarea id="observacoes" rows="4" placeholder="Condições adicionais, prazo de entrega, etc."></textarea>
+            </div>
+            <div class="field-group">
+              <label for="validade-orcamento">Validade do orçamento</label>
+              <input type="date" id="validade-orcamento" />
+              <small class="hint">
+                Data até quando o orçamento é válido.
+              </small>
+            </div>
+
+            <div class="field-group" id="grupo-entrada">
+              <label>Entrada</label>
+              <input
+                type="number"
+                id="entrada-valor"
+                min="0"
+                step="0.01"
+                placeholder="Valor da entrada em R$ (sem desconto)"
+              />
+              <small class="hint">
+                Porcentagem de entrada em relação ao total:
+                <strong><span id="entrada-percentual">0%</span></strong>
+              </small>
+              <label class="checkbox-row" style="margin-top: 6px;">
+                <input type="checkbox" id="entrada-desconto-checkbox" disabled />
+                <span>Cliente elegível para entrada com 2,5%</span>
+              </label>
+              <small class="hint">
+                A opção de 2,5% de desconto é liberada automaticamente quando a entrada for superior ou igual a 30% do valor total.
+              </small>
+              <label class="checkbox-row" style="margin-top: 6px;">
+                <input type="checkbox" id="entrada-pdf-checkbox" />
+                <span>Levar o valor da entrada para o PDF do orçamento</span>
+              </label>
+            </div>
+
+            <div class="field-group" id="grupo-frete">
+              <label for="frete-valor">Frete</label>
+              <input
+                type="number"
+                id="frete-valor"
+                min="0"
+                step="0.01"
+                placeholder="Valor do frete em R$"
+              />
+              <label class="checkbox-row" style="margin-top: 6px;">
+                <input type="checkbox" id="frete-bonificacao-checkbox" />
+                <span>Bonificação</span>
+              </label>
+              <input
+                type="number"
+                id="frete-bonificacao-valor"
+                min="0"
+                step="0.01"
+                placeholder="Valor bonificado em R$"
+                style="margin-top: 6px; display: none;"
+              />
+              <small class="hint">
+                O valor do frete é apenas informativo e será levado para o PDF somente se preenchido.
+              </small>
+            </div>
+          </div>
+
+          <div>
+            <h3>Resumo do Orçamento</h3>
+            <div class="field-group" id="grupo-desconto-gerencia">
+              <label class="checkbox-row">
+                <input type="checkbox" id="desconto-gerencia-checkbox" />
+                <span>Desconto gerência</span>
+              </label>
+              <input
+                type="number"
+                id="desconto-gerencia-percent"
+                min="0"
+                step="0.01"
+                placeholder="Valor do desconto em R$"
+                style="margin-top: 6px; display: none;"
+              />
+              <small class="hint">
+                Quando ativado, permite aplicar um desconto adicional em valor fixo (R$) sobre o total do orçamento.
+                <strong>Atenção:</strong> o desconto gerência só poderá ser aplicado para pagamentos no débito, PIX ou dinheiro.
+              </small>
+            </div>
+            <div class="resumo-linha">
+              <span>Forma de pagamento</span>
+              <span id="orc-forma"></span>
+            </div>
+            <div class="resumo-linha">
+              <span>Nº de parcelas</span>
+              <span id="orc-parcelas"></span>
+            </div>
+            <div class="resumo-linha">
+              <span>Valor dos produtos</span>
+              <span id="orc-subtotal">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span id="orc-ajuste-label">Juros / Desconto</span>
+              <span id="orc-ajuste">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha destaque">
+              <span>Total</span>
+              <span id="orc-total">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha" id="orc-linha-parcela" style="display: none;">
+              <span>Valor da parcela</span>
+              <span id="orc-parcela">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha" id="orc-linha-entrada" style="display: none;">
+              <span id="orc-entrada-label">Entrada (30%)</span>
+              <span id="orc-entrada">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha" id="orc-linha-financiado" style="display: none;">
+              <span>Valor financiado</span>
+              <span id="orc-financiado">R$ 0,00</span>
+            </div>
+
+            <button class="btn primary full" id="btn-gerar-pdf">
+              Baixar PDF do orçamento
+            </button>
+            <button class="btn ghost full" id="btn-voltar">
+              Voltar para a calculadora
+            </button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Produtos do Orçamento</h3>
+          <div class="table-wrapper">
+            <table class="produtos-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Qtd.</th>
+                  <th>Valor Unitário (R$)</th>
+                  <th>Subtotal (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="orc-produtos-body">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <footer class="page-footer">
+          <span>Calculadora Moto Chefe - Desenvolvido por Alan Rigon e Alisson Aldias - Todos direitos reservados.</span>
+        </footer>
+      </main>
+    </div>
+
+    <script src="protection.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
+
+
