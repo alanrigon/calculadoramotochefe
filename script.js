@@ -216,8 +216,9 @@ function initCalculadora() {
   atualizarCalculos();
 }
 
-// Cache global simples para a logo usada no PDF
+// Cache global simples para as logos usadas no PDF
 window.motoChefeLogoDataUrl = window.motoChefeLogoDataUrl || null;
+window.motoChefeLogoBrancaDataUrl = window.motoChefeLogoBrancaDataUrl || null;
 
 // Página: Orçamento / PDF
 function initOrcamento() {
@@ -283,7 +284,8 @@ function initOrcamento() {
 
   const dados = JSON.parse(dadosRaw);
 
-  // Pré-carregar logo para uso no PDF (evita problemas de timing)
+  // Pré-carregar logos para uso no PDF (evita problemas de timing)
+  // Logo colorida (para PDF normal)
   if (!window.motoChefeLogoDataUrl) {
     try {
       const logoSrc =
@@ -301,16 +303,43 @@ function initOrcamento() {
             ctx.drawImage(img, 0, 0);
             window.motoChefeLogoDataUrl = canvas.toDataURL("image/png");
           } catch (e) {
-            console.error("Erro ao preparar logo para o PDF:", e);
+            console.error("Erro ao preparar logo colorida para o PDF:", e);
           }
         };
         img.onerror = () => {
-          console.warn("Não foi possível carregar a imagem da logo para o PDF.");
+          console.warn("Não foi possível carregar a imagem da logo colorida para o PDF.");
         };
         img.src = logoSrc;
       }
     } catch (e) {
-      console.error("Erro ao iniciar pré-carregamento da logo:", e);
+      console.error("Erro ao iniciar pré-carregamento da logo colorida:", e);
+    }
+  }
+
+  // Logo branca (para PDF de impressão)
+  if (!window.motoChefeLogoBrancaDataUrl) {
+    try {
+      const logoBrancaSrc = "LOGO MC - BRANCA .png";
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          window.motoChefeLogoBrancaDataUrl = canvas.toDataURL("image/png");
+        } catch (e) {
+          console.error("Erro ao preparar logo branca para o PDF:", e);
+        }
+      };
+      img.onerror = () => {
+        console.warn("Não foi possível carregar a imagem da logo branca para o PDF.");
+      };
+      img.src = logoBrancaSrc;
+    } catch (e) {
+      console.error("Erro ao iniciar pré-carregamento da logo branca:", e);
     }
   }
 
@@ -781,30 +810,38 @@ function initOrcamento() {
         doc.rect(0, 0, 210, 38, "F");
       }
 
-      // Logo (a partir da mesma imagem do site) – protegido com try/catch para não quebrar o PDF
+      // Logo – protegido com try/catch para não quebrar o PDF
       try {
-        // Usa primeiro o cache global, se existir
-        let logoDataUrl = window.motoChefeLogoDataUrl || null;
+        // Escolhe a logo apropriada: branca para impressão, colorida para PDF normal
+        let logoDataUrl = versaoImpressao 
+          ? (window.motoChefeLogoBrancaDataUrl || null)
+          : (window.motoChefeLogoDataUrl || null);
 
-        // Fallback: tenta novamente a partir do elemento da página
-        if (!logoDataUrl) {
+        // Fallback: para PDF normal, tenta a partir do elemento da página
+        if (!logoDataUrl && !versaoImpressao) {
           const logoEl = document.querySelector(".logo-img");
           if (logoEl && logoEl.complete) {
-            const canvas = document.createElement("canvas");
-            canvas.width = logoEl.naturalWidth;
-            canvas.height = logoEl.naturalHeight;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(logoEl, 0, 0);
-            logoDataUrl = canvas.toDataURL("image/png");
-            window.motoChefeLogoDataUrl = logoDataUrl;
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = logoEl.naturalWidth;
+              canvas.height = logoEl.naturalHeight;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(logoEl, 0, 0);
+              logoDataUrl = canvas.toDataURL("image/png");
+              window.motoChefeLogoDataUrl = logoDataUrl;
+            } catch (e) {
+              console.error("Erro ao preparar logo do elemento:", e);
+            }
           }
         }
 
+        // Adiciona a logo se estiver disponível
         if (logoDataUrl) {
           doc.addImage(logoDataUrl, "PNG", 10, 8, 26, 20);
         }
       } catch (e) {
         // Se der erro na logo, apenas segue sem a imagem
+        console.error("Erro ao adicionar logo no PDF:", e);
       }
 
       // Título e informações - cor depende da versão
