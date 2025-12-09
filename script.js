@@ -143,9 +143,12 @@ function initCalculadora() {
     const numeroParcelas = parseInt(selectParcelas.value || "1", 10);
 
     if (tipoPagamento === "avista") {
-      // 5% de desconto
-      ajuste = -subtotalTotal * 0.05;
-      total = subtotalTotal + ajuste;
+      // 5% de desconto apenas no primeiro produto
+      if (produtos.length > 0 && produtos[0].subtotal > 0) {
+        const descontoPrimeiroProduto = produtos[0].subtotal * 0.05;
+        ajuste = -descontoPrimeiroProduto;
+        total = subtotalTotal + ajuste;
+      }
     } else {
       // Parcelado:
       // Até 12x: sem juros
@@ -481,12 +484,16 @@ function initOrcamento() {
     // Total vindo da calculadora (já com juros/desconto padrão)
     let totalOriginal = dados.total;
 
+    // Valor do primeiro produto (para calcular elegibilidade e descontos)
+    const primeiroProduto = dados.produtos && dados.produtos.length > 0 ? dados.produtos[0] : null;
+    const valorPrimeiroProduto = primeiroProduto ? (primeiroProduto.subtotal || 0) : 0;
+
     // Valor de entrada informado
     let entradaValor = parseNumber(entradaValorInput?.value || "0");
     if (entradaValor < 0) entradaValor = 0;
     if (entradaValor > totalOriginal) entradaValor = totalOriginal;
 
-    // Atualizar porcentagem de entrada
+    // Atualizar porcentagem de entrada (baseada no total para exibição)
     let percEntrada = 0;
     if (totalOriginal > 0 && entradaValor > 0) {
       percEntrada = (entradaValor / totalOriginal) * 100;
@@ -496,8 +503,8 @@ function initOrcamento() {
         percEntrada > 0 ? `${percEntrada.toFixed(1).replace(".", ",")}%` : "0%";
     }
 
-    // Verificar elegibilidade para desconto de 2,5%
-    const elegivelDesconto = percEntrada >= 30;
+    // Verificar elegibilidade para desconto de 2,5% (30% do primeiro produto)
+    const elegivelDesconto = valorPrimeiroProduto > 0 && entradaValor >= (valorPrimeiroProduto * 0.3);
     if (entradaDescontoCheckbox) {
       entradaDescontoCheckbox.disabled = !elegivelDesconto;
       if (!elegivelDesconto) {
@@ -512,10 +519,12 @@ function initOrcamento() {
       }
     }
 
-    // Aplica ou não o desconto de 2,5% sobre o total original
+    // Aplica ou não o desconto de 2,5% apenas no primeiro produto
     let totalBase = totalOriginal;
-    if (elegivelDesconto && entradaDescontoCheckbox?.checked) {
-      totalBase = totalOriginal * 0.975;
+    let descontoEntradaValor = 0;
+    if (elegivelDesconto && entradaDescontoCheckbox?.checked && valorPrimeiroProduto > 0) {
+      descontoEntradaValor = valorPrimeiroProduto * 0.025;
+      totalBase = totalOriginal - descontoEntradaValor;
     }
 
     // Desconto gerência (valor fixo em R$ adicional sobre o total já ajustado)
@@ -732,19 +741,21 @@ function initOrcamento() {
       if (entradaValor < 0) entradaValor = 0;
       if (entradaValor > totalOriginal) entradaValor = totalOriginal;
 
-      // Verificar elegibilidade para desconto de 2,5%
-      let percEntrada = 0;
-      if (totalOriginal > 0 && entradaValor > 0) {
-        percEntrada = (entradaValor / totalOriginal) * 100;
-      }
-      const elegivelDesconto = percEntrada >= 30;
+      // Valor do primeiro produto (para calcular elegibilidade e descontos)
+      const primeiroProduto = dados.produtos && dados.produtos.length > 0 ? dados.produtos[0] : null;
+      const valorPrimeiroProduto = primeiroProduto ? (primeiroProduto.subtotal || 0) : 0;
 
-      // Aplica ou não o desconto de 2,5% sobre o total original
+      // Verificar elegibilidade para desconto de 2,5% (30% do primeiro produto)
+      const elegivelDesconto = valorPrimeiroProduto > 0 && entradaValor >= (valorPrimeiroProduto * 0.3);
+
+      // Aplica ou não o desconto de 2,5% apenas no primeiro produto
       let totalBase = totalOriginal;
       let totalAntesDescontoCliente = totalOriginal; // Guardar para mostrar riscado
+      let descontoEntradaValor = 0;
       
-      if (elegivelDesconto && entradaDescontoCheckbox?.checked) {
-        totalBase = totalOriginal * 0.975;
+      if (elegivelDesconto && entradaDescontoCheckbox?.checked && valorPrimeiroProduto > 0) {
+        descontoEntradaValor = valorPrimeiroProduto * 0.025;
+        totalBase = totalOriginal - descontoEntradaValor;
         totalAntesDescontoCliente = totalBase;
       }
 
@@ -972,6 +983,19 @@ function initOrcamento() {
       doc.line(10, y, 200, y);
       y += 4;
 
+      // Calcular descontos do primeiro produto antes do loop (reutilizando variáveis já declaradas)
+      // Desconto de 5% à vista (apenas no primeiro produto)
+      const descontoAvista = dados.tipoPagamento === "avista" && dados.ajuste < 0 ? Math.abs(dados.ajuste) : 0;
+      
+      // Desconto de 2,5% por entrada (apenas no primeiro produto)
+      const descontoEntradaNoProduto = elegivelDesconto && entradaDescontoCheckbox?.checked && entradaDescontoPdfCheckbox?.checked ? descontoEntradaValor : 0;
+      
+      // Desconto manual por produto no primeiro produto
+      const descontoManualPrimeiro = descontosPorProduto[0] || 0;
+      
+      // Total de descontos no primeiro produto
+      const totalDescontosPrimeiroProduto = descontoAvista + descontoEntradaNoProduto + descontoManualPrimeiro;
+
       doc.setFontSize(9);
       doc.setTextColor(20);
       dados.produtos.forEach((p, index) => {
@@ -983,10 +1007,8 @@ function initOrcamento() {
         doc.text(String(p.qtd), 90, y);
         doc.text(formatCurrency(p.valor), 110, y);
         
-        // Verificar se há desconto aplicado neste produto
-        const descontoProduto = descontosPorProduto[index] || 0;
-        
-        if (descontoProduto > 0) {
+        // Para o primeiro produto, aplicar todos os descontos (5%, 2,5% e manual)
+        if (index === 0 && totalDescontosPrimeiroProduto > 0) {
           // Valor original riscado
           doc.setTextColor(150, 150, 150);
           const valorOriginalTexto = formatCurrency(p.subtotal);
@@ -1000,7 +1022,7 @@ function initOrcamento() {
           } catch (e) {}
           
           // Valor com desconto (verde)
-          const valorComDesconto = p.subtotal - descontoProduto;
+          const valorComDesconto = p.subtotal - totalDescontosPrimeiroProduto;
           if (versaoImpressao) {
             doc.setTextColor(0, 100, 0);
           } else {
@@ -1008,7 +1030,37 @@ function initOrcamento() {
           }
           doc.text(formatCurrency(valorComDesconto), 180, y);
           doc.setTextColor(20);
+        } else if (index > 0) {
+          // Para outros produtos, verificar apenas desconto manual
+          const descontoProduto = descontosPorProduto[index] || 0;
+          
+          if (descontoProduto > 0) {
+            // Valor original riscado
+            doc.setTextColor(150, 150, 150);
+            const valorOriginalTexto = formatCurrency(p.subtotal);
+            doc.text(valorOriginalTexto, 160, y);
+            // Linha riscando
+            try {
+              const larguraOriginal = doc.getTextWidth(valorOriginalTexto);
+              doc.setDrawColor(150, 150, 150);
+              doc.setLineWidth(0.2);
+              doc.line(160, y - 1, 160 + larguraOriginal, y - 1);
+            } catch (e) {}
+            
+            // Valor com desconto (verde)
+            const valorComDesconto = p.subtotal - descontoProduto;
+            if (versaoImpressao) {
+              doc.setTextColor(0, 100, 0);
+            } else {
+              doc.setTextColor(0, 150, 0);
+            }
+            doc.text(formatCurrency(valorComDesconto), 180, y);
+            doc.setTextColor(20);
+          } else {
+            doc.text(formatCurrency(p.subtotal), 180, y);
+          }
         } else {
+          // Primeiro produto sem descontos
           doc.text(formatCurrency(p.subtotal), 180, y);
         }
         y += 5;
@@ -1094,11 +1146,10 @@ function initOrcamento() {
         totalDescontos += Math.abs(dados.ajuste);
       }
 
-      // Desconto de 2,5% por entrada (só soma se checkbox de exibir no PDF estiver marcado)
-      if (elegivelDesconto && entradaDescontoCheckbox?.checked && entradaDescontoPdfCheckbox?.checked) {
-        const descontoEntrada = totalOriginal - (totalOriginal * 0.975);
-        descontosGerais += descontoEntrada;
-        totalDescontos += descontoEntrada;
+      // Desconto de 2,5% por entrada (apenas no primeiro produto; só soma se checkbox de exibir no PDF estiver marcado)
+      if (elegivelDesconto && entradaDescontoCheckbox?.checked && entradaDescontoPdfCheckbox?.checked && descontoEntradaValor > 0) {
+        descontosGerais += descontoEntradaValor;
+        totalDescontos += descontoEntradaValor;
       }
       
       // Desconto especial do cliente (somar aos descontos gerais)
@@ -1154,23 +1205,7 @@ function initOrcamento() {
         });
       }
 
-      // Frete (se aplicado)
-      if (freteValor > 0) {
-        linhasTabela.push({
-          descricao: "Frete",
-          valor: freteValor,
-          negrito: false
-        });
-      }
-
-      // Bonificação de frete (se aplicada) - exibir como desconto
-      if (freteBonificadoValor > 0) {
-        linhasTabela.push({
-          descricao: "Bonificação de Frete",
-          valor: -freteBonificadoValor,
-          negrito: false
-        });
-      }
+      // Frete e bonificação removidos da tabela - serão exibidos entre a tabela e o total com destaque
 
       // Desenhar linhas da tabela com fundo cinza alternado
       linhasTabela.forEach((linha, index) => {
@@ -1215,6 +1250,99 @@ function initOrcamento() {
 
       y += linhasTabela.length * alturaLinha;
       y += 3;
+
+      // Frete com destaque (entre a tabela e o total)
+      if (freteValor > 0 || freteBonificadoValor > 0) {
+        // Linha separadora antes do frete
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.line(colDescricao, y, larguraTabela, y);
+        y += 5;
+        
+        // Calcular valor final do frete
+        let valorFreteFinal = freteValor;
+        if (freteBonificadoValor > 0) {
+          valorFreteFinal = freteValor - freteBonificadoValor;
+        }
+        
+        // Frete com destaque visual
+        doc.setFontSize(10);
+        doc.setFont(undefined, "bold");
+        doc.setTextColor(20);
+        doc.text("Frete", colDescricao + 2, y);
+        
+        // Valor do frete (com bonificação se houver)
+        if (freteBonificadoValor > 0) {
+          // Calcular larguras primeiro
+          const freteFinalTexto = formatCurrency(valorFreteFinal);
+          const freteOriginalTexto = formatCurrency(freteValor);
+          
+          let freteFinalWidth = 30;
+          let freteOriginalWidth = 30;
+          try {
+            freteFinalWidth = doc.getTextWidth(freteFinalTexto);
+            freteOriginalWidth = doc.getTextWidth(freteOriginalTexto);
+          } catch (e) {}
+          
+          // Valor com bonificação (destacado, à direita)
+          doc.setFontSize(10);
+          if (versaoImpressao) {
+            doc.setTextColor(0, 120, 0);
+          } else {
+            doc.setTextColor(0, 150, 0);
+          }
+          doc.setFont(undefined, "bold");
+          try {
+            doc.text(freteFinalTexto, colValor - freteFinalWidth, y);
+          } catch (e) {
+            doc.text(freteFinalTexto, colValor - 30, y);
+          }
+          
+          // Valor original riscado (à esquerda do valor final, com espaço)
+          const espacoEntreValores = 8;
+          const xOriginal = colValor - freteFinalWidth - espacoEntreValores - freteOriginalWidth;
+          
+          doc.setFontSize(9);
+          doc.setTextColor(120, 120, 120);
+          doc.setFont(undefined, "normal");
+          try {
+            doc.text(freteOriginalTexto, xOriginal, y);
+            // Linha riscando o valor original
+            doc.setDrawColor(120, 120, 120);
+            doc.setLineWidth(0.3);
+            doc.line(xOriginal - 1, y - 1.5, xOriginal + freteOriginalWidth + 1, y - 1.5);
+          } catch (e) {
+            doc.text(freteOriginalTexto, colValor - 60, y);
+          }
+          
+          // Texto da bonificação abaixo
+          doc.setFontSize(8);
+          doc.setTextColor(100, 100, 100);
+          doc.setFont(undefined, "italic");
+          doc.text(`(Bonificação: ${formatCurrency(freteBonificadoValor)})`, colDescricao + 2, y + 4);
+        } else {
+          // Sem bonificação, mostra só o valor do frete (sem riscar)
+          doc.setFontSize(10);
+          doc.setFont(undefined, "bold");
+          doc.setTextColor(20);
+          const freteTexto = formatCurrency(freteValor);
+          try {
+            const freteWidth = doc.getTextWidth ? doc.getTextWidth(freteTexto) : 30;
+            doc.text(freteTexto, colValor - freteWidth, y);
+          } catch (e) {
+            doc.text(freteTexto, colValor - 30, y);
+          }
+        }
+        
+        doc.setFont(undefined, "normal");
+        y += freteBonificadoValor > 0 ? 8 : 5;
+        
+        // Linha separadora após o frete
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.3);
+        doc.line(colDescricao, y, larguraTabela, y);
+        y += 3;
+      }
 
       // Total em caixa destacada
       const yTotal = y;
