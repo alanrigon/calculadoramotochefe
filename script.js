@@ -762,6 +762,13 @@ function initOrcamento() {
       // Estilo geral
       doc.setFont("helvetica", "normal");
 
+      // Medidas de página e reservas de layout
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const bottomMargin = 12;
+      const obsMaxLines = 16;
+      const obsLineHeight = 4; // altura constante para controlar o espaço das observações
+      const obsAreaHeight = obsMaxLines * obsLineHeight;
+
       // Cabeçalho - versão colorida ou impressão
       if (versaoImpressao) {
         // Versão para impressão: sem fundo preto, apenas borda
@@ -1227,47 +1234,69 @@ function initOrcamento() {
         y += 5;
       }
 
-      // Observações
-      if (obs) {
-        if (y > 250) {
-          doc.addPage();
-          y = 20;
-        }
-        y += 6;
+      // Reservas fixas para observação (até 16 linhas) e desconto gerência
+      const descontoGerenciaAtivo =
+        descontoGerenciaCheckbox?.checked && descontoGerenciaPercent > 0;
+      const descontoBlockHeight = descontoGerenciaAtivo ? 26 : 0;
+      const yDescontoStart = pageHeight - bottomMargin - descontoBlockHeight;
+
+      // Área de observação nunca invade o bloco de desconto e respeita 16 linhas
+      const yObsStart = y + 6;
+      const maxObsArea = Math.max(0, yDescontoStart - yObsStart);
+      const maxObsLines = Math.min(
+        obsMaxLines,
+        Math.floor(maxObsArea / obsLineHeight)
+      );
+
+      if (obs && maxObsLines > 0) {
         doc.setFontSize(11);
         doc.setFont(undefined, "bold");
-        doc.text("Observações", 10, y);
+        doc.setTextColor(20);
+        doc.text("Observações", 10, yObsStart);
         doc.setFont(undefined, "normal");
-        y += 5;
-        doc.setFontSize(10);
-        const linhas = doc.splitTextToSize(obs, 180);
-        doc.text(linhas, 10, y);
+        doc.setFontSize(9.5);
+        doc.setTextColor(20);
+
+        const obsLines = doc.splitTextToSize(obs, 180).slice(0, maxObsLines);
+        let obsY = yObsStart + 5;
+        obsLines.forEach((linha) => {
+          doc.text(linha, 10, obsY);
+          obsY += obsLineHeight;
+        });
+        // Garantir que o restante volte para cor padrão
+        doc.setTextColor(20);
       }
 
-      // Observação específica de desconto gerência (se aplicado)
-      if (descontoGerenciaCheckbox?.checked && descontoGerenciaPercent > 0) {
-        if (y > 240) {
-          doc.addPage();
-          y = 20;
-        }
-        y += 8;
-        doc.setFontSize(11);
+      // Avança o cursor até o fim da área reservada (mesmo que não tenha observações)
+      const obsAreaConsumida = Math.min(obsAreaHeight, maxObsArea);
+      y = yObsStart + obsAreaConsumida;
+
+      // Bloco de desconto de gerência sempre ancorado ao final da página
+      if (descontoGerenciaAtivo) {
+        const descontoY = yDescontoStart + 4;
+        doc.setFontSize(9);
         doc.setTextColor(20);
         doc.setFont(undefined, "bold");
+        doc.text("Desconto gerência", 10, descontoY);
+
+        doc.setFont(undefined, "normal");
+        doc.setFontSize(8.5);
         doc.text(
-          "Desconto válido para pagamentos no débito, PIX ou dinheiro",
+          "Válido para pagamentos no débito, PIX ou dinheiro.",
           10,
-          y
+          descontoY + 5
         );
-        y += 8;
-        doc.text("Autorizado por:", 10, y);
-        y += 12;
+
+        const assinaturaY = yDescontoStart + descontoBlockHeight - 8;
+        doc.setFontSize(8.5);
+        doc.text("Autorizado por:", 10, assinaturaY);
+
         doc.setDrawColor(0);
-        doc.line(10, y, 90, y); // linha para assinatura
-        y += 5;
-        doc.setFontSize(8);
-        doc.text("Assinatura", 10, y);
-        // volta fonte para normal para o restante (se houver)
+        doc.setLineWidth(0.3);
+        doc.line(10, assinaturaY + 8, 90, assinaturaY + 8); // linha para assinatura
+        doc.setFontSize(7.5);
+        doc.text("Assinatura", 10, assinaturaY + 13);
+
         doc.setFont(undefined, "normal");
       }
 
