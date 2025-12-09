@@ -676,8 +676,46 @@ function initOrcamento() {
     window.location.href = "index.html";
   });
 
+  // Função auxiliar para carregar logo branca
+  function carregarLogoBranca() {
+    return new Promise((resolve) => {
+      // Se já estiver no cache, retorna imediatamente
+      if (window.motoChefeLogoBrancaDataUrl) {
+        resolve(window.motoChefeLogoBrancaDataUrl);
+        return;
+      }
+
+      const logoBrancaSrc = "LOGO MC - BRANCA .png";
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL("image/png");
+          window.motoChefeLogoBrancaDataUrl = dataUrl;
+          resolve(dataUrl);
+        } catch (e) {
+          console.error("Erro ao preparar logo branca:", e);
+          resolve(null);
+        }
+      };
+      
+      img.onerror = () => {
+        console.warn("Não foi possível carregar a logo branca.");
+        resolve(null);
+      };
+      
+      img.src = logoBrancaSrc;
+    });
+  }
+
   // Função para gerar PDF (reutilizável para versão colorida e impressão)
-  function gerarPDF(versaoImpressao = false) {
+  async function gerarPDF(versaoImpressao = false) {
     const nome = document.getElementById("cliente-nome").value.trim();
     const contato = document.getElementById("cliente-contato").value.trim();
     const obs = document.getElementById("observacoes").value.trim();
@@ -812,25 +850,30 @@ function initOrcamento() {
 
       // Logo – protegido com try/catch para não quebrar o PDF
       try {
-        // Escolhe a logo apropriada: branca para impressão, colorida para PDF normal
-        let logoDataUrl = versaoImpressao 
-          ? (window.motoChefeLogoBrancaDataUrl || null)
-          : (window.motoChefeLogoDataUrl || null);
+        let logoDataUrl = null;
 
-        // Fallback: para PDF normal, tenta a partir do elemento da página
-        if (!logoDataUrl && !versaoImpressao) {
-          const logoEl = document.querySelector(".logo-img");
-          if (logoEl && logoEl.complete) {
-            try {
-              const canvas = document.createElement("canvas");
-              canvas.width = logoEl.naturalWidth;
-              canvas.height = logoEl.naturalHeight;
-              const ctx = canvas.getContext("2d");
-              ctx.drawImage(logoEl, 0, 0);
-              logoDataUrl = canvas.toDataURL("image/png");
-              window.motoChefeLogoDataUrl = logoDataUrl;
-            } catch (e) {
-              console.error("Erro ao preparar logo do elemento:", e);
+        if (versaoImpressao) {
+          // PDF de impressão: usa logo branca - aguarda carregamento se necessário
+          logoDataUrl = await carregarLogoBranca();
+        } else {
+          // PDF normal: usa logo colorida
+          logoDataUrl = window.motoChefeLogoDataUrl || null;
+          
+          // Fallback: tenta a partir do elemento da página
+          if (!logoDataUrl) {
+            const logoEl = document.querySelector(".logo-img");
+            if (logoEl && logoEl.complete) {
+              try {
+                const canvas = document.createElement("canvas");
+                canvas.width = logoEl.naturalWidth;
+                canvas.height = logoEl.naturalHeight;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(logoEl, 0, 0);
+                logoDataUrl = canvas.toDataURL("image/png");
+                window.motoChefeLogoDataUrl = logoDataUrl;
+              } catch (e) {
+                console.error("Erro ao preparar logo do elemento:", e);
+              }
             }
           }
         }
@@ -838,6 +881,8 @@ function initOrcamento() {
         // Adiciona a logo se estiver disponível
         if (logoDataUrl) {
           doc.addImage(logoDataUrl, "PNG", 10, 8, 26, 20);
+        } else {
+          console.warn(`Logo não disponível para ${versaoImpressao ? 'impressão' : 'PDF normal'}`);
         }
       } catch (e) {
         // Se der erro na logo, apenas segue sem a imagem
