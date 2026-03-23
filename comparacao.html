@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Comparação por Produto - Moto Chefe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/webp" href="moto-chefe-maringa2-19.webp" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  </head>
+  <body id="pagina-comparacao">
+    <div class="app-container">
+      <aside class="brand-panel">
+        <div class="logo-placeholder">
+          <img
+            src="moto-chefe-maringa2-19.webp"
+            alt="Logo Moto Chefe"
+            class="logo-img"
+          />
+        </div>
+        <div class="brand-text">
+          <h1>Moto Chefe</h1>
+          <p>Comparação</p>
+        </div>
+      </aside>
+
+      <main class="content-panel">
+        <header class="page-header">
+          <h2>Comparação por produto</h2>
+          <p>Valores e parcelamento individual para cada item.</p>
+        </header>
+
+        <section class="card">
+          <h3>Condições de pagamento</h3>
+          <div class="resumo-linha">
+            <span>Forma de pagamento</span>
+            <span id="comparacao-forma"></span>
+          </div>
+          <div class="resumo-linha" id="comparacao-linha-parcelas" style="display: none;">
+            <span>Nº de parcelas</span>
+            <span id="comparacao-num-parcelas"></span>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Comparação</h3>
+          <div class="table-wrapper comparacao-values-table-wrapper">
+            <table class="comparacao-values-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th class="text-right">Subtotal (R$)</th>
+                  <th class="text-right">Juros / Desconto</th>
+                  <th class="text-right">Total (R$)</th>
+                  <th class="comparacao-col-parcelado">Parcela (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="comparacao-table-body">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="actions-row">
+          <button class="btn ghost full" id="btn-voltar-index">
+            ← Voltar
+          </button>
+          <button class="btn primary full" id="btn-ir-orcamento">
+            Gerar orçamento
+          </button>
+        </div>
+      </main>
+    </div>
+
+    <script src="protection.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
+

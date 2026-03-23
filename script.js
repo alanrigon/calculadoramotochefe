@@ -21,6 +21,71 @@ function initCalculadora() {
   const resumoTotal = document.getElementById("resumo-total");
   const resumoParcela = document.getElementById("resumo-parcela");
   const linhaParcela = document.getElementById("linha-parcela");
+  const btnCompararProdutos = document.getElementById("btn-comparar-produtos");
+  const calcClienteNome = document.getElementById("calc-cliente-nome");
+  const calcClienteContato = document.getElementById("calc-cliente-contato");
+  const calcValidadeOrcamento = document.getElementById(
+    "calc-validade-orcamento"
+  );
+  const calcObservacoes = document.getElementById("calc-observacoes");
+
+  // Modelo (Original x Comparação)
+  const btnModeloCalculadoraOriginal = document.getElementById(
+    "btn-modelo-calculo-original"
+  );
+  const btnModeloCalculadoraComparacao = document.getElementById(
+    "btn-modelo-calculo-comparacao"
+  );
+  const resumoOriginalCalcContainer = document.getElementById(
+    "resumo-original-calc-container"
+  );
+  const resumoComparacaoCalcContainer = document.getElementById(
+    "resumo-comparacao-calc-container"
+  );
+  const comparacaoCalcBody = document.getElementById("comparacao-calc-body");
+  const comparacaoCalcTotal = document.getElementById("comparacao-calc-total");
+  const comparacaoCalcAjuste = document.getElementById(
+    "comparacao-calc-ajuste"
+  );
+
+  let modeloCalculadoraAtual = "original"; // original | comparacao
+
+  function setModeloCalculadora(modelo) {
+    modeloCalculadoraAtual = modelo;
+
+    if (btnModeloCalculadoraOriginal && btnModeloCalculadoraComparacao) {
+      if (modelo === "original") {
+        btnModeloCalculadoraOriginal.classList.add("chip-selected");
+        btnModeloCalculadoraComparacao.classList.remove("chip-selected");
+      } else {
+        btnModeloCalculadoraComparacao.classList.add("chip-selected");
+        btnModeloCalculadoraOriginal.classList.remove("chip-selected");
+      }
+    }
+
+    if (resumoOriginalCalcContainer && resumoComparacaoCalcContainer) {
+      if (modelo === "original") {
+        resumoOriginalCalcContainer.style.display = "";
+        resumoComparacaoCalcContainer.style.display = "none";
+      } else {
+        resumoOriginalCalcContainer.style.display = "none";
+        resumoComparacaoCalcContainer.style.display = "";
+      }
+    }
+
+    atualizarCalculos();
+  }
+
+  if (btnModeloCalculadoraOriginal) {
+    btnModeloCalculadoraOriginal.addEventListener("click", () =>
+      setModeloCalculadora("original")
+    );
+  }
+  if (btnModeloCalculadoraComparacao) {
+    btnModeloCalculadoraComparacao.addEventListener("click", () =>
+      setModeloCalculadora("comparacao")
+    );
+  }
 
   // Preencher opções de parcelas 1-21
   for (let i = 1; i <= 21; i++) {
@@ -173,6 +238,78 @@ function initCalculadora() {
       resumoParcela.textContent = formatCurrency(valorParcela);
     }
 
+    if (modeloCalculadoraAtual === "comparacao") {
+      // Preencher tabela de comparação por produto
+      if (comparacaoCalcBody) {
+        comparacaoCalcBody.innerHTML = "";
+      }
+
+      // Juros percentuais por cenário de parcelamento
+      let jurosPercent = 0;
+      if (tipoPagamento === "parcelado") {
+        if (numeroParcelas <= 12) jurosPercent = 0;
+        else if (numeroParcelas <= 18) jurosPercent = 0.05;
+        else jurosPercent = 0.075;
+      }
+
+      let ajusteComparacaoTotal = 0;
+      let totalComparacao = 0;
+
+      produtos.forEach((p, index) => {
+        const subtotalProduto = p.subtotal;
+
+        let ajusteProduto = 0;
+        if (tipoPagamento === "avista") {
+          // Mantém a regra existente: desconto de 5% apenas no primeiro produto
+          if (index === 0 && subtotalProduto > 0) {
+            ajusteProduto = -subtotalProduto * 0.05;
+          }
+        } else {
+          ajusteProduto = subtotalProduto * jurosPercent;
+        }
+
+        const totalProduto = subtotalProduto + ajusteProduto;
+        const valorParcelaProduto =
+          tipoPagamento === "parcelado" && numeroParcelas > 0
+            ? totalProduto / numeroParcelas
+            : totalProduto;
+
+        ajusteComparacaoTotal += ajusteProduto;
+        totalComparacao += totalProduto;
+
+        if (comparacaoCalcBody) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${p.nome || "-"}</td>
+            <td class="text-right">${formatCurrency(subtotalProduto)}</td>
+            <td class="text-right">${formatCurrency(ajusteProduto)}</td>
+            <td class="text-right">${formatCurrency(totalProduto)}</td>
+            <td class="text-right comparacao-col-parcelado">
+              ${tipoPagamento === "parcelado" ? formatCurrency(valorParcelaProduto) : "-"}
+            </td>
+          `;
+          comparacaoCalcBody.appendChild(tr);
+        }
+      });
+
+      if (comparacaoCalcTotal) {
+        comparacaoCalcTotal.textContent = formatCurrency(totalComparacao);
+      }
+      if (comparacaoCalcAjuste) {
+        comparacaoCalcAjuste.textContent = formatCurrency(ajusteComparacaoTotal);
+      }
+
+      // Mostrar/ocultar coluna de parcela
+      if (resumoComparacaoCalcContainer) {
+        const exibirParcela = tipoPagamento === "parcelado";
+        resumoComparacaoCalcContainer
+          .querySelectorAll(".comparacao-col-parcelado")
+          .forEach((el) => {
+            el.style.display = exibirParcela ? "" : "none";
+          });
+      }
+    }
+
     // Armazenar dados atuais em memória (para botão de gerar orçamento)
     calculoAtual = {
       produtos,
@@ -182,6 +319,8 @@ function initCalculadora() {
       tipoPagamento,
       numeroParcelas: tipoPagamento === "parcelado" ? numeroParcelas : 1,
       valorParcela: tipoPagamento === "parcelado" ? valorParcela : total,
+      modeloCalculadora: modeloCalculadoraAtual,
+      cliente: coletarDadosCliente(),
     };
   }
 
@@ -193,13 +332,72 @@ function initCalculadora() {
     tipoPagamento: "avista",
     numeroParcelas: 1,
     valorParcela: 0,
+    cliente: {
+      nome: "",
+      contato: "",
+      validade: "",
+      observacoes: "",
+    },
   };
+
+  function coletarDadosCliente() {
+    return {
+      nome: calcClienteNome?.value?.trim() || "",
+      contato: calcClienteContato?.value?.trim() || "",
+      validade: calcValidadeOrcamento?.value || "",
+      observacoes: calcObservacoes?.value?.trim() || "",
+    };
+  }
+
+  function validarDadosCliente() {
+    const cliente = coletarDadosCliente();
+    if (!cliente.nome) {
+      alert("Preencha o nome do cliente antes de continuar.");
+      calcClienteNome?.focus();
+      return false;
+    }
+    if (!cliente.contato) {
+      alert("Preencha o telefone/WhatsApp do cliente antes de continuar.");
+      calcClienteContato?.focus();
+      return false;
+    }
+    if (!cliente.validade) {
+      alert("Preencha a validade do orçamento antes de continuar.");
+      calcValidadeOrcamento?.focus();
+      return false;
+    }
+    return true;
+  }
+
+  // Prefill com último orçamento salvo
+  try {
+    const dadosSalvosRaw =
+      localStorage.getItem("moto-chefe-orcamento") ||
+      localStorage.getItem("moto-chefe-comparacao");
+    if (dadosSalvosRaw) {
+      const dadosSalvos = JSON.parse(dadosSalvosRaw);
+      const cliente = dadosSalvos?.cliente || {};
+      if (calcClienteNome && cliente.nome) calcClienteNome.value = cliente.nome;
+      if (calcClienteContato && cliente.contato) {
+        calcClienteContato.value = cliente.contato;
+      }
+      if (calcValidadeOrcamento && cliente.validade) {
+        calcValidadeOrcamento.value = cliente.validade;
+      }
+      if (calcObservacoes && cliente.observacoes) {
+        calcObservacoes.value = cliente.observacoes;
+      }
+    }
+  } catch (e) {}
 
   btnGerarOrcamento.addEventListener("click", () => {
     atualizarCalculos();
 
     if (!calculoAtual.produtos.length) {
       alert("Adicione pelo menos um produto com quantidade e valor válidos.");
+      return;
+    }
+    if (!validarDadosCliente()) {
       return;
     }
 
@@ -214,6 +412,38 @@ function initCalculadora() {
 
     window.location.href = "orcamento.html";
   });
+
+  if (btnCompararProdutos) {
+    btnCompararProdutos.addEventListener("click", () => {
+      atualizarCalculos();
+
+      if (!calculoAtual.produtos.length) {
+        alert("Adicione pelo menos um produto com quantidade e valor válidos.");
+        return;
+      }
+      if (!validarDadosCliente()) {
+        return;
+      }
+
+      // Salva tanto para a página de comparação quanto para a página de orçamento
+      localStorage.setItem(
+        "moto-chefe-orcamento",
+        JSON.stringify({
+          ...calculoAtual,
+          criadoEm: new Date().toISOString(),
+        })
+      );
+      localStorage.setItem(
+        "moto-chefe-comparacao",
+        JSON.stringify({
+          ...calculoAtual,
+          criadoEm: new Date().toISOString(),
+        })
+      );
+
+      window.location.href = "comparacao.html";
+    });
+  }
 
   // Cálculo inicial
   atualizarCalculos();
@@ -248,7 +478,86 @@ function initOrcamento() {
   );
   const validadeInput = document.getElementById("validade-orcamento");
   const btnGerarPdfImpressao = document.getElementById("btn-gerar-pdf-impressao");
-  
+  const btnGerarPdfComparacao = document.getElementById(
+    "btn-gerar-pdf-comparacao"
+  );
+  const btnGerarPdfImpressaoComparacao = document.getElementById(
+    "btn-gerar-pdf-impressao-comparacao"
+  );
+
+  // Modelo do orçamento (original x comparação por produto)
+  const btnModeloOriginal = document.getElementById("btn-modelo-original");
+  const btnModeloComparacao = document.getElementById("btn-modelo-comparacao");
+  const resumoOriginalContainer = document.getElementById(
+    "resumo-original-container"
+  );
+  const resumoComparacaoContainer = document.getElementById(
+    "resumo-comparacao-container"
+  );
+  const comparacaoBody = document.getElementById("comparacao-body");
+  const comparacaoTotalSpan = document.getElementById(
+    "orc-comparacao-total"
+  );
+  const comparacaoLinhaParcela = document.getElementById(
+    "orc-comparacao-linha-parcela"
+  );
+  const comparacaoParcelaSpan = document.getElementById(
+    "orc-comparacao-parcela"
+  );
+  const comparacaoLinhaEntrada = document.getElementById(
+    "orc-comparacao-linha-entrada"
+  );
+  const comparacaoEntradaSpan = document.getElementById(
+    "orc-comparacao-entrada"
+  );
+  const comparacaoLinhaFinanciado = document.getElementById(
+    "orc-comparacao-linha-financiado"
+  );
+  const comparacaoFinanciadoSpan = document.getElementById(
+    "orc-comparacao-financiado"
+  );
+
+  let modeloOrcamentoAtual = "original";
+
+  function setModeloOrcamento(modelo) {
+    modeloOrcamentoAtual = modelo;
+
+    // Toggle visual
+    if (btnModeloOriginal && btnModeloComparacao) {
+      if (modelo === "original") {
+        btnModeloOriginal.classList.add("chip-selected");
+        btnModeloComparacao.classList.remove("chip-selected");
+      } else {
+        btnModeloComparacao.classList.add("chip-selected");
+        btnModeloOriginal.classList.remove("chip-selected");
+      }
+    }
+
+    // Toggle de exibição
+    if (resumoOriginalContainer && resumoComparacaoContainer) {
+      if (modelo === "original") {
+        resumoOriginalContainer.style.display = "";
+        resumoComparacaoContainer.style.display = "none";
+      } else {
+        resumoOriginalContainer.style.display = "none";
+        resumoComparacaoContainer.style.display = "";
+      }
+    }
+
+    recalcularResumo();
+  }
+
+  if (btnModeloOriginal) {
+    btnModeloOriginal.addEventListener("click", () =>
+      setModeloOrcamento("original")
+    );
+  }
+  if (btnModeloComparacao) {
+    btnModeloComparacao.addEventListener("click", () =>
+      setModeloOrcamento("comparacao")
+    );
+  }
+
   // Elementos para desconto por produto
   const descontoProdutoSelect = document.getElementById("desconto-produto-select");
   const descontoProdutoValor = document.getElementById("desconto-produto-valor");
@@ -286,6 +595,24 @@ function initOrcamento() {
   }
 
   const dados = JSON.parse(dadosRaw);
+
+  // Prefill dos dados de cliente vindos da calculadora
+  const clienteDados = dados?.cliente || {};
+  const clienteNomeInput = document.getElementById("cliente-nome");
+  const clienteContatoInput = document.getElementById("cliente-contato");
+  const observacoesInput = document.getElementById("observacoes");
+  if (clienteNomeInput && clienteDados.nome) {
+    clienteNomeInput.value = clienteDados.nome;
+  }
+  if (clienteContatoInput && clienteDados.contato) {
+    clienteContatoInput.value = clienteDados.contato;
+  }
+  if (observacoesInput && clienteDados.observacoes) {
+    observacoesInput.value = clienteDados.observacoes;
+  }
+  if (validadeInput && clienteDados.validade) {
+    validadeInput.value = clienteDados.validade;
+  }
 
   // Pré-carregar logos para uso no PDF (evita problemas de timing)
   // Logo colorida (para PDF normal)
@@ -480,7 +807,7 @@ function initOrcamento() {
     grupoEntrada.style.display = "none";
   }
 
-  function recalcularResumo() {
+  function recalcularResumoOriginal() {
     // Total vindo da calculadora (já com juros/desconto padrão)
     let totalOriginal = dados.total;
 
@@ -619,6 +946,209 @@ function initOrcamento() {
     campoTotal.textContent = formatCurrency(totalBase);
     if (dados.tipoPagamento === "parcelado") {
       campoParcela.textContent = formatCurrency(valorParcelaFinal);
+    }
+  }
+
+  function recalcularResumoComparacao() {
+    // Visibilidade da entrada/parcelas é dependente apenas do tipo de pagamento
+    if (dados.tipoPagamento === "parcelado") {
+      linhaParcela.style.display = "";
+      grupoEntrada.style.display = "block";
+    } else {
+      linhaParcela.style.display = "none";
+      grupoEntrada.style.display = "none";
+    }
+
+    // Entrada (R$) - usada para cálculos individuais por produto
+    let entradaValor = parseNumber(entradaValorInput?.value || "0");
+    if (entradaValor < 0) entradaValor = 0;
+
+    const totalOriginal = dados.total;
+    if (entradaValor > totalOriginal) entradaValor = totalOriginal;
+
+    // Percentual de entrada em relação ao total (para exibição)
+    let percEntrada = 0;
+    if (totalOriginal > 0 && entradaValor > 0) {
+      percEntrada = (entradaValor / totalOriginal) * 100;
+    }
+    if (entradaPercentualSpan) {
+      entradaPercentualSpan.textContent =
+        percEntrada > 0 ? `${percEntrada.toFixed(1).replace(".", ",")}%` : "0%";
+    }
+
+    // Checkbox 2,5%: habilita se existir algum produto elegível
+    const elegivelDescontoAny = (dados.produtos || []).some((p) => {
+      const subtotal = parseNumber(p?.subtotal ?? 0);
+      return subtotal > 0 && entradaValor >= subtotal * 0.3;
+    });
+
+    if (entradaDescontoCheckbox) {
+      entradaDescontoCheckbox.disabled = !elegivelDescontoAny;
+      if (!elegivelDescontoAny) {
+        entradaDescontoCheckbox.checked = false;
+      }
+    }
+
+    if (entradaDescontoPdfCheckbox) {
+      entradaDescontoPdfCheckbox.disabled =
+        !elegivelDescontoAny || !entradaDescontoCheckbox?.checked;
+      if (!elegivelDescontoAny || !entradaDescontoCheckbox?.checked) {
+        entradaDescontoPdfCheckbox.checked = false;
+      }
+    }
+
+    // Mostrar/ocultar colunas parceladas na tabela
+    const mostrarParcelado = dados.tipoPagamento === "parcelado";
+    document.querySelectorAll(".comparacao-col-parcelado").forEach((el) => {
+      el.style.display = mostrarParcelado ? "" : "none";
+    });
+
+    // Preparar juros por quantidade de parcelas (mesma regra para todos os produtos)
+    const numeroParcelas = parseInt(dados.numeroParcelas || "1", 10) || 1;
+    let jurosPercent = 0;
+    if (dados.tipoPagamento === "parcelado") {
+      if (numeroParcelas <= 12) jurosPercent = 0;
+      else if (numeroParcelas <= 18) jurosPercent = 0.05;
+      else jurosPercent = 0.075;
+    }
+
+    // Frete e bonificação (mesmos valores em cada coluna/cenário comparativo)
+    let freteValorResumo = parseNumber(freteInput?.value || "0");
+    if (freteValorResumo < 0) freteValorResumo = 0;
+
+    let freteBonificadoResumo = 0;
+    if (freteBonificacaoCheckbox?.checked && freteBonificacaoInput) {
+      freteBonificadoResumo = parseNumber(freteBonificacaoInput.value || "0");
+      if (freteBonificadoResumo < 0) freteBonificadoResumo = 0;
+    }
+
+    // Montar tabela de comparação por produto
+    if (comparacaoBody) {
+      comparacaoBody.innerHTML = "";
+    }
+
+    let totalComparacao = 0;
+    let entradaSomada = 0;
+    let financiadoSomado = 0;
+    let parcelaSomada = 0;
+
+    (dados.produtos || []).forEach((p, index) => {
+      const subtotalProduto = parseNumber(p?.subtotal ?? 0);
+
+      // Juros/desconto base (cada produto é tratado como cenário individual)
+      let ajusteBase = 0;
+      if (dados.tipoPagamento === "avista") {
+        ajusteBase = -subtotalProduto * 0.05; // 5% no cenário do produto
+      } else {
+        ajusteBase = subtotalProduto * jurosPercent;
+      }
+
+      let totalBaseProduto = subtotalProduto + ajusteBase;
+
+      // Desconto por entrada (2,5% quando entrada >= 30% do próprio produto)
+      const elegivelProduto = subtotalProduto > 0 && entradaValor >= subtotalProduto * 0.3;
+      let descontoEntradaValor = 0;
+      if (entradaDescontoCheckbox?.checked && elegivelProduto) {
+        descontoEntradaValor = subtotalProduto * 0.025;
+        totalBaseProduto -= descontoEntradaValor;
+      }
+
+      // Desconto gerência (aplicado no total do produto)
+      let descontoGerenciaValor = 0;
+      if (descontoGerenciaCheckbox?.checked) {
+        descontoGerenciaValor = parseNumber(descontoGerenciaInput?.value || "0");
+        if (descontoGerenciaValor < 0) descontoGerenciaValor = 0;
+        if (descontoGerenciaValor > totalBaseProduto) {
+          descontoGerenciaValor = totalBaseProduto;
+        }
+        totalBaseProduto -= descontoGerenciaValor;
+      }
+
+      // Desconto manual por produto
+      let descontoManualValor = 0;
+      const manual = parseNumber(descontosPorProduto[index] || 0);
+      if (manual > 0) {
+        descontoManualValor = Math.min(manual, totalBaseProduto);
+        totalBaseProduto -= descontoManualValor;
+      }
+
+      // Frete e bonificação
+      if (freteValorResumo > 0) totalBaseProduto += freteValorResumo;
+      if (freteBonificadoResumo > 0) totalBaseProduto -= freteBonificadoResumo;
+
+      if (totalBaseProduto < 0) totalBaseProduto = 0;
+
+      // Entrada/financiado/parcela (apenas no modo parcelado)
+      let entradaAplicada = 0;
+      let financiado = 0;
+      let parcela = 0;
+      if (dados.tipoPagamento === "parcelado") {
+        entradaAplicada = Math.min(entradaValor, totalBaseProduto);
+        financiado = totalBaseProduto - entradaAplicada;
+        parcela = numeroParcelas > 0 ? financiado / numeroParcelas : 0;
+      }
+
+      totalComparacao += totalBaseProduto;
+      if (dados.tipoPagamento === "parcelado") {
+        entradaSomada += entradaAplicada;
+        financiadoSomado += financiado;
+        parcelaSomada += parcela;
+      }
+
+      if (!comparacaoBody) return;
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${p?.nome || "-"}</td>
+        <td class="text-right">${formatCurrency(subtotalProduto)}</td>
+        <td class="text-right">${formatCurrency(ajusteBase)}</td>
+        <td class="text-right">${formatCurrency(totalBaseProduto)}</td>
+        <td class="text-right comparacao-col-parcelado">${
+          dados.tipoPagamento === "parcelado" ? formatCurrency(entradaAplicada) : "-"
+        }</td>
+        <td class="text-right comparacao-col-parcelado">${
+          dados.tipoPagamento === "parcelado" ? formatCurrency(financiado) : "-"
+        }</td>
+        <td class="text-right comparacao-col-parcelado">${
+          dados.tipoPagamento === "parcelado" ? formatCurrency(parcela) : "-"
+        }</td>
+      `;
+      comparacaoBody.appendChild(tr);
+    });
+
+    if (comparacaoTotalSpan) {
+      comparacaoTotalSpan.textContent = formatCurrency(totalComparacao);
+    }
+
+    const isParcelado = dados.tipoPagamento === "parcelado";
+    if (comparacaoLinhaParcela) {
+      comparacaoLinhaParcela.style.display = isParcelado ? "" : "none";
+    }
+    if (comparacaoLinhaEntrada) {
+      comparacaoLinhaEntrada.style.display = isParcelado ? "" : "none";
+    }
+    if (comparacaoLinhaFinanciado) {
+      comparacaoLinhaFinanciado.style.display = isParcelado ? "" : "none";
+    }
+
+    if (isParcelado) {
+      if (comparacaoParcelaSpan) {
+        comparacaoParcelaSpan.textContent = formatCurrency(parcelaSomada);
+      }
+      if (comparacaoEntradaSpan) {
+        comparacaoEntradaSpan.textContent = formatCurrency(entradaSomada);
+      }
+      if (comparacaoFinanciadoSpan) {
+        comparacaoFinanciadoSpan.textContent = formatCurrency(financiadoSomado);
+      }
+    }
+  }
+
+  function recalcularResumo() {
+    if (modeloOrcamentoAtual === "comparacao") {
+      recalcularResumoComparacao();
+    } else {
+      recalcularResumoOriginal();
     }
   }
 
@@ -1520,6 +2050,352 @@ function initOrcamento() {
     }
   }
 
+  // PDF alternativo: comparação por produto (1 linha por produto)
+  async function gerarPDFComparacao(versaoImpressao = false) {
+    const nome = document.getElementById("cliente-nome").value.trim();
+    const contato = document.getElementById("cliente-contato").value.trim();
+    const obs = document.getElementById("observacoes").value.trim();
+    const validade = validadeInput?.value;
+
+    if (!nome) {
+      alert("Informe o nome do cliente para gerar o PDF.");
+      return;
+    }
+
+    try {
+      // Recalcular valores exatamente como a tabela de comparação
+      let entradaValor = parseNumber(entradaValorInput?.value || "0");
+      if (entradaValor < 0) entradaValor = 0;
+
+      const isParcelado = dados.tipoPagamento === "parcelado";
+      const numeroParcelas = parseInt(dados.numeroParcelas || "1", 10) || 1;
+
+      let jurosPercent = 0;
+      if (isParcelado) {
+        if (numeroParcelas <= 12) jurosPercent = 0;
+        else if (numeroParcelas <= 18) jurosPercent = 0.05;
+        else jurosPercent = 0.075;
+      }
+
+      let freteValorResumo = parseNumber(freteInput?.value || "0");
+      if (freteValorResumo < 0) freteValorResumo = 0;
+
+      let freteBonificadoResumo = 0;
+      if (freteBonificacaoCheckbox?.checked && freteBonificacaoInput) {
+        freteBonificadoResumo = parseNumber(
+          freteBonificacaoInput.value || "0"
+        );
+        if (freteBonificadoResumo < 0) freteBonificadoResumo = 0;
+      }
+
+      // Tentar obter jsPDF
+      let jsPDFLib = null;
+      if (window.jspdf && window.jspdf.jsPDF) {
+        jsPDFLib = window.jspdf.jsPDF;
+      } else if (window.jsPDF) {
+        jsPDFLib = window.jsPDF;
+      }
+
+      if (!jsPDFLib) {
+        alert(
+          "Não foi possível carregar a biblioteca de PDF (jsPDF). Verifique sua conexão com a internet e tente novamente."
+        );
+        return;
+      }
+
+      const doc = new jsPDFLib();
+      doc.setFont("helvetica", "normal");
+
+      // Header
+      if (versaoImpressao) {
+        doc.setDrawColor(100, 100, 100);
+        doc.setLineWidth(0.5);
+        doc.rect(5, 5, 200, 33);
+      } else {
+        doc.setFillColor(20, 20, 22);
+        doc.rect(0, 0, 210, 38, "F");
+      }
+
+      // Logo
+      try {
+        let logoDataUrl = null;
+        if (versaoImpressao) {
+          logoDataUrl = await carregarLogoBranca();
+        } else {
+          logoDataUrl = window.motoChefeLogoDataUrl || null;
+          if (!logoDataUrl) {
+            const logoEl = document.querySelector(".logo-img");
+            if (logoEl && logoEl.complete) {
+              const canvas = document.createElement("canvas");
+              canvas.width = logoEl.naturalWidth;
+              canvas.height = logoEl.naturalHeight;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(logoEl, 0, 0);
+              logoDataUrl = canvas.toDataURL("image/png");
+              window.motoChefeLogoDataUrl = logoDataUrl;
+            }
+          }
+        }
+
+        if (logoDataUrl) {
+          doc.addImage(logoDataUrl, "PNG", 10, 8, 26, 20);
+        }
+      } catch (e) {
+        // Apenas segue sem logo
+      }
+
+      // Título e informações
+      if (versaoImpressao) doc.setTextColor(20);
+      else doc.setTextColor(255);
+
+      doc.setFontSize(14);
+      doc.setFont(undefined, "bold");
+      doc.text("Moto Chefe Maringá", 40, 14);
+
+      doc.setFontSize(10);
+      if (versaoImpressao) doc.setTextColor(60);
+      else doc.setTextColor(220);
+      doc.setFont(undefined, "normal");
+      doc.text("(44) 9 8838-1000", 40, 20);
+      doc.text("(44) 3346-1866", 40, 24);
+      doc.text("Av. São Paulo, 451 - Sala 01 - Centro, Maringá/PR", 40, 28);
+      doc.setFontSize(8);
+      if (versaoImpressao) doc.setTextColor(0, 100, 180);
+      else doc.setTextColor(100, 180, 255);
+      doc.text("www.motochefemaringa.com.br", 40, 33);
+
+      let y = 47;
+
+      // Subtítulo do documento
+      if (versaoImpressao) doc.setTextColor(20);
+      else doc.setTextColor(20);
+      doc.setFontSize(11);
+      doc.setFont(undefined, "bold");
+      doc.text("Comparação por produto", 10, y);
+      y += 6;
+
+      // Dados do cliente
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(20);
+      doc.text(`Cliente: ${nome}`, 10, y);
+      if (contato) {
+        y += 5;
+        doc.text(`Contato: ${contato}`, 10, y);
+      }
+
+      // Forma de pagamento
+      y += 5;
+      const formaTextoPdf =
+        dados.tipoPagamento === "avista"
+          ? "À vista"
+          : `Parcelado em ${numeroParcelas}x`;
+      doc.text(`Forma de pagamento: ${formaTextoPdf}`, 10, y);
+
+      // Resumo de validade (se preenchida)
+      if (validade) {
+        y += 6;
+        const validadeDate = new Date(validade);
+        const validadeFormatada = validadeDate.toLocaleDateString("pt-BR");
+        doc.setFont(undefined, "bold");
+        doc.text("Validade do orçamento:", 10, y);
+        doc.setFont(undefined, "normal");
+        // Alinhamento à direita sem depender de opções do jsPDF
+        try {
+          const w = doc.getTextWidth(validadeFormatada);
+          doc.text(validadeFormatada, 200 - w, y);
+        } catch (e) {
+          doc.text(validadeFormatada, 170, y);
+        }
+      }
+
+      y += 8;
+
+      function textRight(text, xRight, yText) {
+        const t = String(text ?? "");
+        try {
+          const w = doc.getTextWidth(t);
+          doc.text(t, xRight - w, yText);
+        } catch (e) {
+          doc.text(t, xRight - 30, yText);
+        }
+      }
+
+      // Blocos separados por produto (mais legível)
+      const left = 10;
+      const right = 200;
+      const pageBottom = 275;
+      const titleLineH = 3.6;
+      const valueLineH = 4.2;
+
+      let totalComparacao = 0;
+      let entradaSomada = 0;
+      let financiadoSomado = 0;
+      let parcelaSomada = 0;
+
+      const manualGerenciaValor =
+        descontoGerenciaCheckbox?.checked && descontoGerenciaInput
+          ? parseNumber(descontoGerenciaInput.value || "0")
+          : 0;
+
+      (dados.produtos || []).forEach((p, index) => {
+        const subtotalProduto = parseNumber(p?.subtotal ?? 0);
+
+        let ajusteBase = 0;
+        if (dados.tipoPagamento === "avista") {
+          ajusteBase = -subtotalProduto * 0.05;
+        } else {
+          ajusteBase = subtotalProduto * jurosPercent;
+        }
+
+        let totalBaseProduto = subtotalProduto + ajusteBase;
+
+        // Desconto de 2,5% por entrada (apenas se elegível)
+        const elegivelProduto =
+          subtotalProduto > 0 && entradaValor >= subtotalProduto * 0.3;
+        if (
+          entradaDescontoCheckbox?.checked &&
+          elegivelProduto &&
+          subtotalProduto > 0
+        ) {
+          const descontoEntradaValor = subtotalProduto * 0.025;
+          totalBaseProduto -= descontoEntradaValor;
+        }
+
+        // Desconto gerência (valor fixo por orçamento; nesta versão, aparece por produto conforme cálculo da tela)
+        if (descontoGerenciaCheckbox?.checked && manualGerenciaValor > 0) {
+          const descontoGerenciaValor = Math.min(
+            manualGerenciaValor,
+            totalBaseProduto
+          );
+          totalBaseProduto -= descontoGerenciaValor;
+        }
+
+        // Desconto manual por produto
+        const manual = parseNumber(descontosPorProduto[index] || 0);
+        if (manual > 0) {
+          const descontoManualValor = Math.min(manual, totalBaseProduto);
+          totalBaseProduto -= descontoManualValor;
+        }
+
+        // Frete / bonificação (por produto conforme tela)
+        if (freteValorResumo > 0) totalBaseProduto += freteValorResumo;
+        if (freteBonificadoResumo > 0) totalBaseProduto -= freteBonificadoResumo;
+
+        if (totalBaseProduto < 0) totalBaseProduto = 0;
+
+        let entradaAplicada = 0;
+        let financiado = 0;
+        let parcela = 0;
+        if (isParcelado) {
+          entradaAplicada = Math.min(entradaValor, totalBaseProduto);
+          financiado = totalBaseProduto - entradaAplicada;
+          parcela = numeroParcelas > 0 ? financiado / numeroParcelas : 0;
+        }
+
+        totalComparacao += totalBaseProduto;
+        if (isParcelado) {
+          entradaSomada += entradaAplicada;
+          financiadoSomado += financiado;
+          parcelaSomada += parcela;
+        }
+
+        const nomeProduto = p?.nome || "-";
+        const titleLines = doc.splitTextToSize(nomeProduto, 150).slice(0, 3);
+        const titleH = titleLines.length * titleLineH;
+        const valueLines = isParcelado ? 6 : 4; // subtotal, ajuste, total (+3 no parcelado)
+        const blockHeight = titleH + valueLines * valueLineH + 10;
+
+        if (y + blockHeight > pageBottom) {
+          doc.addPage();
+          y = 20;
+        }
+
+        // Borda do bloco do produto
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(0.25);
+        doc.rect(left, y, right - left, blockHeight);
+
+        // Título
+        doc.setFontSize(10);
+        doc.setFont(undefined, "bold");
+        doc.setTextColor(20);
+        const titleY = y + 5;
+        titleLines.forEach((ln, i) => {
+          doc.text(ln, left + 4, titleY + i * titleLineH);
+        });
+
+        // Valores
+        doc.setFont(undefined, "normal");
+        doc.setFontSize(9.5);
+        let yy = titleY + titleH + 2;
+
+        doc.setTextColor(20);
+        doc.text("Subtotal", left + 6, yy);
+        textRight(formatCurrency(subtotalProduto), right - 2, yy);
+        yy += valueLineH;
+
+        // Ajuste (verde para desconto, vermelho para juros)
+        doc.text("Juros/Desconto", left + 6, yy);
+        if (ajusteBase < 0) {
+          doc.setTextColor(0, 150, 0);
+        } else if (ajusteBase > 0) {
+          doc.setTextColor(200, 40, 40);
+        } else {
+          doc.setTextColor(20);
+        }
+        textRight(formatCurrency(ajusteBase), right - 2, yy);
+        doc.setTextColor(20);
+        yy += valueLineH;
+
+        doc.text("Total", left + 6, yy);
+        textRight(formatCurrency(totalBaseProduto), right - 2, yy);
+        yy += valueLineH;
+
+        if (isParcelado) {
+          doc.text("Entrada", left + 6, yy);
+          textRight(formatCurrency(entradaAplicada), right - 2, yy);
+          yy += valueLineH;
+
+          doc.text("Financiado", left + 6, yy);
+          textRight(formatCurrency(financiado), right - 2, yy);
+          yy += valueLineH;
+
+          doc.text("Parcela", left + 6, yy);
+          textRight(formatCurrency(parcela), right - 2, yy);
+          yy += valueLineH;
+        }
+
+        // Avança cursor
+        y += blockHeight + 2;
+      });
+
+      // Observações
+      if (obs) {
+        y += 8;
+        doc.setFont(undefined, "bold");
+        doc.text("Observações", left, y);
+        doc.setFont(undefined, "normal");
+        const obsLines = doc.splitTextToSize(obs, 190).slice(0, 14);
+        y += 4;
+        obsLines.forEach((ln) => {
+          doc.text(ln, left, y);
+          y += 4;
+        });
+      }
+
+      const sufixo = versaoImpressao ? "-impressao" : "";
+      doc.save(
+        `orcamento-comparacao-${nome.replace(/\\s+/g, "-").toLowerCase()}${sufixo}.pdf`
+      );
+    } catch (err) {
+      console.error("Erro ao gerar PDF (comparação):", err);
+      alert(
+        "Ocorreu um erro ao gerar o PDF de comparação. Se possível, abra o console do navegador (F12) e me envie a mensagem de erro exibida."
+      );
+    }
+  }
+
   // Event listeners para os botões de PDF
   btnGerarPdf.addEventListener("click", () => gerarPDF(false));
   
@@ -1527,8 +2403,128 @@ function initOrcamento() {
     btnGerarPdfImpressao.addEventListener("click", () => gerarPDF(true));
   }
 
+  if (btnGerarPdfComparacao) {
+    btnGerarPdfComparacao.addEventListener("click", () =>
+      gerarPDFComparacao(false)
+    );
+  }
+
+  if (btnGerarPdfImpressaoComparacao) {
+    btnGerarPdfImpressaoComparacao.addEventListener("click", () =>
+      gerarPDFComparacao(true)
+    );
+  }
+
   // Inicializar estado de entrada
   recalcularResumo();
+}
+
+// Página: Comparação por produto (tela clara com cards)
+function initComparacao() {
+  const dadosRaw = localStorage.getItem("moto-chefe-comparacao");
+  const btnVoltar = document.getElementById("btn-voltar-index");
+  const btnIrOrcamento = document.getElementById("btn-ir-orcamento");
+
+  const comparacaoTableBody = document.getElementById(
+    "comparacao-table-body"
+  );
+  const formaSpan = document.getElementById("comparacao-forma");
+  const linhaParcelas = document.getElementById("comparacao-linha-parcelas");
+  const numParcelasSpan = document.getElementById(
+    "comparacao-num-parcelas"
+  );
+  // No modelo de comparação, não exibimos total somado entre produtos.
+
+  if (!dadosRaw) {
+    alert("Nenhum cálculo encontrado para comparação. Voltando para a calculadora.");
+    window.location.href = "index.html";
+    return;
+  }
+
+  const dados = JSON.parse(dadosRaw);
+  const produtos = Array.isArray(dados.produtos) ? dados.produtos : [];
+
+  if (!comparacaoTableBody) return;
+  comparacaoTableBody.innerHTML = "";
+
+  const tipoPagamento = dados.tipoPagamento || "avista";
+  const numeroParcelas = parseInt(dados.numeroParcelas || "1", 10) || 1;
+  const isParcelado = tipoPagamento === "parcelado";
+
+  if (formaSpan) {
+    formaSpan.textContent = isParcelado
+      ? `Parcelado em ${numeroParcelas}x`
+      : "À vista (5% de desconto em cada item)";
+  }
+
+  if (linhaParcelas) {
+    linhaParcelas.style.display = isParcelado ? "" : "none";
+  }
+  if (isParcelado && numParcelasSpan) {
+    numParcelasSpan.textContent = `${numeroParcelas}x`;
+  }
+
+  // Juros percentuais por cenário de parcelamento
+  let jurosPercent = 0;
+  if (isParcelado) {
+    if (numeroParcelas <= 12) jurosPercent = 0;
+    else if (numeroParcelas <= 18) jurosPercent = 0.05;
+    else jurosPercent = 0.075;
+  }
+
+  produtos.forEach((p, index) => {
+    const nomeProduto = p?.nome || `Produto ${index + 1}`;
+    const subtotal = parseNumber(p?.subtotal ?? 0);
+
+    let ajuste = 0;
+    if (!isParcelado) {
+      // À vista: 5% de desconto em cada produto (comparação)
+      ajuste = -subtotal * 0.05;
+    } else {
+      ajuste = subtotal * jurosPercent;
+    }
+
+    const totalProduto = subtotal + ajuste;
+    const parcela = isParcelado ? totalProduto / numeroParcelas : 0;
+
+    const tr = document.createElement("tr");
+    tr.className = "comparacao-product-row";
+    tr.innerHTML = `
+      <td>${nomeProduto}</td>
+      <td class="text-right">${formatCurrency(subtotal)}</td>
+      <td class="text-right">
+        <span class="comparacao-value-ajuste ${ajuste >= 0 ? "positive" : ""}">
+          ${formatCurrency(ajuste)}
+        </span>
+      </td>
+      <td class="text-right">${formatCurrency(totalProduto)}</td>
+      <td class="text-right comparacao-col-parcelado">
+        ${isParcelado ? formatCurrency(parcela) : "-"}
+      </td>
+    `;
+
+    comparacaoTableBody.appendChild(tr);
+  });
+
+  // Ajusta visibilidade da coluna de parcela na tabela
+  document
+    .querySelectorAll(".comparacao-col-parcelado")
+    .forEach((el) => {
+      el.style.display = isParcelado ? "" : "none";
+    });
+
+
+  if (btnVoltar) {
+    btnVoltar.addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+  }
+
+  if (btnIrOrcamento) {
+    btnIrOrcamento.addEventListener("click", () => {
+      window.location.href = "orcamento.html";
+    });
+  }
 }
 
 // Bootstrap
@@ -1537,6 +2533,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initCalculadora();
   } else if (document.body.id === "pagina-orcamento") {
     initOrcamento();
+  } else if (document.body.id === "pagina-comparacao") {
+    initComparacao();
   }
 });
 

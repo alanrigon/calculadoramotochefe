@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Calculadora - Moto Chefe (Prévia)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles-preview.css" />
+    <link rel="icon" type="image/webp" href="moto-chefe-maringa2-19.webp" />
+  </head>
+  <body id="pagina-calculadora">
+    <div class="preview-shell">
+      <header class="preview-header">
+        <div class="preview-brand">
+          <img
+            src="moto-chefe-maringa2-19.webp"
+            alt="Logo Moto Chefe"
+            class="preview-logo"
+          />
+          <div class="preview-brand-text">
+            <h1>Moto Chefe</h1>
+            <p>Calculadora de orçamento</p>
+          </div>
+        </div>
+        <div class="preview-badge">Orçamento rápido e profissional</div>
+      </header>
+
+      <main class="preview-grid">
+        <section class="preview-card">
+          <h3 class="preview-card-title">Produtos</h3>
+          <div class="table-wrapper">
+            <table class="produtos-table">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th>Qtd.</th>
+                  <th>Valor Unitário (R$)</th>
+                  <th>Subtotal (R$)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="produtos-body">
+                <!-- Linhas adicionadas via JS -->
+              </tbody>
+            </table>
+          </div>
+          <button class="btn ghost" id="btn-adicionar-produto">
+            + Adicionar produto
+          </button>
+        </section>
+
+        <section class="preview-card preview-card-right">
+          <div class="preview-subsection">
+            <h3 class="preview-card-title">Condições de Pagamento</h3>
+
+            <div class="field-group">
+              <label class="preview-label">Tipo de pagamento</label>
+              <div class="chip-group">
+                <button
+                  type="button"
+                  class="chip chip-selected"
+                  data-pagamento="avista"
+                >
+                  À vista (5% de desconto)
+                </button>
+                <button
+                  type="button"
+                  class="chip"
+                  data-pagamento="parcelado"
+                >
+                  Parcelado (5% até 18x, 7,5% de 19x a 21x)
+                </button>
+              </div>
+            </div>
+
+            <div class="field-group" id="campo-parcelas" style="display: none;">
+              <label for="parcelas" class="preview-label">Número de parcelas</label>
+              <select id="parcelas">
+                <!-- 1 a 21 parcelas -->
+              </select>
+              <small class="hint">
+                Até 12x: sem juros. 13x a 18x: juros de 5% sobre o total. 19x a 21x: juros de 7,5% sobre o total.
+              </small>
+            </div>
+          </div>
+
+          <div class="preview-subsection">
+            <h3 class="preview-card-title">Resumo</h3>
+
+            <div class="resumo-linha">
+              <span>Valor dos produtos</span>
+              <span id="resumo-subtotal">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha">
+              <span id="resumo-ajuste-label">Juros / Desconto</span>
+              <span id="resumo-ajuste">R$ 0,00</span>
+            </div>
+            <div class="resumo-linha destaque">
+              <span>Total</span>
+              <span id="resumo-total">R$ 0,00</span>
+            </div>
+
+            <div class="resumo-linha" id="linha-parcela" style="display: none;">
+              <span>Valor da parcela</span>
+              <span id="resumo-parcela">R$ 0,00</span>
+            </div>
+
+            <button class="btn primary full" id="btn-gerar-orcamento">
+              Gerar orçamento
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="preview-footer">
+        <span>Calculadora Moto Chefe - Desenvolvido por Alan Rigon e Alisson Aldias.</span>
+      </footer>
+    </div>
+
+    <script src="protection.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
+

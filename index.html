@@ -47,6 +47,47 @@
           <button class="btn ghost" id="btn-adicionar-produto">+ Adicionar produto</button>
         </section>
 
+        <section class="card">
+          <h3>Dados do Cliente (pré-orçamento)</h3>
+          <div class="grid-2">
+            <div>
+              <div class="field-group">
+                <label for="calc-cliente-nome">Nome do cliente</label>
+                <input
+                  type="text"
+                  id="calc-cliente-nome"
+                  placeholder="Nome completo"
+                />
+              </div>
+              <div class="field-group">
+                <label for="calc-cliente-contato">Telefone / WhatsApp</label>
+                <input
+                  type="tel"
+                  id="calc-cliente-contato"
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+            </div>
+            <div>
+              <div class="field-group">
+                <label for="calc-validade-orcamento">Validade do orçamento</label>
+                <input type="date" id="calc-validade-orcamento" />
+              </div>
+              <div class="field-group">
+                <label for="calc-observacoes">Observações</label>
+                <textarea
+                  id="calc-observacoes"
+                  rows="3"
+                  placeholder="Condições adicionais, prazo de entrega, etc."
+                ></textarea>
+              </div>
+            </div>
+          </div>
+          <small class="hint">
+            Esses dados serão levados para a página de orçamento e para o PDF.
+          </small>
+        </section>
+
         <section class="card grid-2">
           <div>
             <h3>Condições de Pagamento</h3>
@@ -90,6 +131,9 @@
               <span id="resumo-parcela">R$ 0,00</span>
             </div>
 
+            <button class="btn ghost full" id="btn-comparar-produtos">
+              📊 Comparar por produto
+            </button>
             <button class="btn primary full" id="btn-gerar-orcamento">
               Gerar orçamento
             </button>

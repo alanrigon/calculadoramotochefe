@@ -149,6 +149,30 @@
                 <strong>Atenção:</strong> o desconto gerência só poderá ser aplicado para pagamentos no débito, PIX ou dinheiro.
               </small>
             </div>
+            <div class="field-group" id="grupo-modelo-orcamento" style="display: none;">
+              <label>Modelo do orçamento</label>
+              <div class="chip-group">
+                <button
+                  type="button"
+                  class="chip chip-selected"
+                  data-modelo="original"
+                  id="btn-modelo-original"
+                >
+                  Original
+                </button>
+                <button
+                  type="button"
+                  class="chip"
+                  data-modelo="comparacao"
+                  id="btn-modelo-comparacao"
+                >
+                  Comparação por produto
+                </button>
+              </div>
+              <small class="hint">
+                No modo comparação, os totais e parcelamentos são calculados individualmente por produto.
+              </small>
+            </div>
             <div class="resumo-linha">
               <span>Forma de pagamento</span>
               <span id="orc-forma"></span>
@@ -157,29 +181,74 @@
               <span>Nº de parcelas</span>
               <span id="orc-parcelas"></span>
             </div>
-            <div class="resumo-linha">
-              <span>Valor dos produtos</span>
-              <span id="orc-subtotal">R$ 0,00</span>
+            <div id="resumo-original-container">
+              <div class="resumo-linha">
+                <span>Valor dos produtos</span>
+                <span id="orc-subtotal">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha">
+                <span id="orc-ajuste-label">Juros / Desconto</span>
+                <span id="orc-ajuste">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha destaque">
+                <span>Total</span>
+                <span id="orc-total">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha" id="orc-linha-parcela" style="display: none;">
+                <span>Valor da parcela</span>
+                <span id="orc-parcela">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha" id="orc-linha-entrada" style="display: none;">
+                <span id="orc-entrada-label">Entrada (30%)</span>
+                <span id="orc-entrada">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha" id="orc-linha-financiado" style="display: none;">
+                <span>Valor financiado</span>
+                <span id="orc-financiado">R$ 0,00</span>
+              </div>
             </div>
-            <div class="resumo-linha">
-              <span id="orc-ajuste-label">Juros / Desconto</span>
-              <span id="orc-ajuste">R$ 0,00</span>
-            </div>
-            <div class="resumo-linha destaque">
-              <span>Total</span>
-              <span id="orc-total">R$ 0,00</span>
-            </div>
-            <div class="resumo-linha" id="orc-linha-parcela" style="display: none;">
-              <span>Valor da parcela</span>
-              <span id="orc-parcela">R$ 0,00</span>
-            </div>
-            <div class="resumo-linha" id="orc-linha-entrada" style="display: none;">
-              <span id="orc-entrada-label">Entrada (30%)</span>
-              <span id="orc-entrada">R$ 0,00</span>
-            </div>
-            <div class="resumo-linha" id="orc-linha-financiado" style="display: none;">
-              <span>Valor financiado</span>
-              <span id="orc-financiado">R$ 0,00</span>
+
+            <div id="resumo-comparacao-container" style="display: none;">
+              <div class="comparacao-subtitulo">Comparação por produto</div>
+
+              <div class="resumo-linha">
+                <span>Total do orçamento (comparação)</span>
+                <span id="orc-comparacao-total">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha" id="orc-comparacao-linha-parcela" style="display: none;">
+                <span>Parcela somada</span>
+                <span id="orc-comparacao-parcela">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha" id="orc-comparacao-linha-entrada" style="display: none;">
+                <span>Entrada somada</span>
+                <span id="orc-comparacao-entrada">R$ 0,00</span>
+              </div>
+              <div class="resumo-linha" id="orc-comparacao-linha-financiado" style="display: none;">
+                <span>Financiado somado</span>
+                <span id="orc-comparacao-financiado">R$ 0,00</span>
+              </div>
+
+              <div class="table-wrapper comparacao-table-wrapper">
+                <table class="comparacao-table">
+                  <thead>
+                    <tr>
+                      <th>Produto</th>
+                      <th>Subtotal (R$)</th>
+                      <th>Juros / Desconto</th>
+                      <th>Total (R$)</th>
+                      <th class="comparacao-col-parcelado">Entrada</th>
+                      <th class="comparacao-col-parcelado">Financiado</th>
+                      <th class="comparacao-col-parcelado">Parcela</th>
+                    </tr>
+                  </thead>
+                  <tbody id="comparacao-body">
+                    <!-- Preenchido via JS -->
+                  </tbody>
+                </table>
+              </div>
+              <small class="hint">
+                As colunas de “Entrada/Financiado/Parcela” aparecem somente no modo parcelado.
+              </small>
             </div>
 
             <button class="btn primary full" id="btn-gerar-pdf">
@@ -187,6 +256,12 @@
             </button>
             <button class="btn ghost full" id="btn-gerar-pdf-impressao">
               🖨️ PDF para Impressão (sem fundo)
+            </button>
+            <button class="btn ghost full" id="btn-gerar-pdf-comparacao">
+              📊 Baixar PDF (comparação)
+            </button>
+            <button class="btn ghost full" id="btn-gerar-pdf-impressao-comparacao">
+              🖨️ PDF para Impressão (comparação sem fundo)
             </button>
             <button class="btn ghost full" id="btn-voltar">
               ← Voltar para a calculadora
