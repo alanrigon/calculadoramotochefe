@@ -224,7 +224,7 @@ function initCalculadora() {
       } else if (numeroParcelas <= 18) {
         ajuste = subtotalTotal * 0.05;
       } else {
-        ajuste = subtotalTotal * 0.075;
+        ajuste = subtotalTotal * 0.0919;
       }
       total = subtotalTotal + ajuste;
       valorParcela = numeroParcelas > 0 ? total / numeroParcelas : 0;
