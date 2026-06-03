@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Pedido de Venda - Moto Chefe</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" type="image/webp" href="moto-chefe-maringa2-19.webp" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  </head>
+  <body id="pagina-pedido-venda">
+    <div class="app-container">
+      <aside class="brand-panel">
+        <div class="logo-placeholder">
+          <img src="moto-chefe-maringa2-19.webp" alt="Logo Moto Chefe" class="logo-img" />
+        </div>
+        <div class="brand-text">
+          <h1>Moto Chefe</h1>
+          <p>Pedido de Venda</p>
+        </div>
+      </aside>
+
+      <main class="content-panel">
+        <header class="page-header page-header-row">
+          <div>
+            <h2>Pedido de Venda</h2>
+            <p>
+              Documento para envio ao banco (financiamento). Gera PDF colorido com a
+              identidade da loja.
+            </p>
+          </div>
+          <a href="index.html" class="btn ghost">← Voltar à calculadora</a>
+        </header>
+
+        <section class="card">
+          <h3>Dados do cliente</h3>
+          <div class="grid-2">
+            <div class="field-group">
+              <label for="pv-cliente-nome">Nome completo</label>
+              <input type="text" id="pv-cliente-nome" placeholder="Nome do cliente" />
+            </div>
+            <div class="field-group">
+              <label for="pv-cliente-cpf">CPF</label>
+              <input type="text" id="pv-cliente-cpf" placeholder="000.000.000-00" />
+            </div>
+            <div class="field-group">
+              <label for="pv-cliente-contato">Telefone / WhatsApp</label>
+              <input type="tel" id="pv-cliente-contato" placeholder="(00) 00000-0000" />
+            </div>
+            <div class="field-group">
+              <label for="pv-vendedor-nome">Vendedor que atendeu</label>
+              <input type="text" id="pv-vendedor-nome" placeholder="Nome do vendedor" />
+            </div>
+          </div>
+          <div class="field-group">
+            <label for="pv-observacoes">Observações (financiamento, condições, etc.)</label>
+            <textarea
+              id="pv-observacoes"
+              rows="3"
+              placeholder="Ex.: Financiamento mobilidade elétrica — sujeito à análise de crédito."
+            ></textarea>
+          </div>
+        </section>
+
+        <section class="card">
+          <h3>Produtos</h3>
+          <p class="hint catalogo-hint">
+            Produtos vêm do arquivo
+            <strong>produtos-catalogo.js</strong>. Digite na caixa para filtrar ou escolha na
+            lista. Sem entrada no produto, o valor recebe <strong>+5%</strong> automaticamente.
+          </p>
+          <datalist id="pv-produtos-datalist"></datalist>
+          <div id="pv-produtos-container" class="pv-produtos-container"></div>
+          <button type="button" class="btn ghost" id="pv-btn-adicionar-produto">
+            + Adicionar produto
+          </button>
+        </section>
+
+        <section class="card">
+          <h3>Resumo</h3>
+          <div class="resumo-linha">
+            <span>Total do pedido</span>
+            <span id="pv-resumo-total">R$ 0,00</span>
+          </div>
+          <div class="resumo-linha">
+            <span>Total de entradas informadas</span>
+            <span id="pv-resumo-entradas">R$ 0,00</span>
+          </div>
+          <div class="resumo-linha destaque">
+            <span>Valor a financiar (estimado)</span>
+            <span id="pv-resumo-financiar">R$ 0,00</span>
+          </div>
+          <small class="hint">
+            Valor a financiar = total do pedido menos a soma das entradas dos produtos que
+            tiverem entrada marcada.
+          </small>
+          <button type="button" class="btn primary full" id="pv-btn-gerar-pdf" style="margin-top: 14px;">
+            📥 Gerar PDF (colorido)
+          </button>
+        </section>
+
+        <footer class="page-footer">
+          <span
+            >Calculadora Moto Chefe - Desenvolvido por Alan Rigon e Alisson Aldias - Todos
+            direitos reservados.</span
+          >
+        </footer>
+      </main>
+    </div>
+
+    <script src="protection.js"></script>
+    <script src="produtos-catalogo.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

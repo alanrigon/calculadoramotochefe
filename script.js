@@ -28,6 +28,15 @@ function initCalculadora() {
     "calc-validade-orcamento"
   );
   const calcObservacoes = document.getElementById("calc-observacoes");
+  const navFerramentas = document.getElementById("nav-ferramentas");
+
+  if (navFerramentas) {
+    navFerramentas.addEventListener("change", () => {
+      const destino = navFerramentas.value;
+      if (destino) window.location.href = destino;
+      navFerramentas.value = "";
+    });
+  }
 
   // Modelo (Original x Comparação)
   const btnModeloCalculadoraOriginal = document.getElementById(
@@ -2527,6 +2536,670 @@ function initComparacao() {
   }
 }
 
+// Cabeçalho PDF colorido (compartilhado: orçamento e pedido de venda)
+async function obterLogoColoridaDataUrl() {
+  if (window.motoChefeLogoDataUrl) return window.motoChefeLogoDataUrl;
+
+  const logoEl = document.querySelector(".logo-img");
+  if (logoEl && logoEl.complete && logoEl.naturalWidth) {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = logoEl.naturalWidth;
+      canvas.height = logoEl.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(logoEl, 0, 0);
+      window.motoChefeLogoDataUrl = canvas.toDataURL("image/png");
+      return window.motoChefeLogoDataUrl;
+    } catch (e) {
+      console.error("Erro ao preparar logo para PDF:", e);
+    }
+  }
+
+  return new Promise((resolve) => {
+    const logoSrc =
+      document.querySelector(".logo-img")?.src || "moto-chefe-maringa2-19.webp";
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        window.motoChefeLogoDataUrl = canvas.toDataURL("image/png");
+        resolve(window.motoChefeLogoDataUrl);
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = logoSrc;
+  });
+}
+
+async function desenharCabecalhoPdfColorido(doc) {
+  doc.setFillColor(20, 20, 22);
+  doc.rect(0, 0, 210, 38, "F");
+
+  try {
+    const logoDataUrl = await obterLogoColoridaDataUrl();
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", 10, 8, 26, 20);
+    }
+  } catch (e) {
+    console.error("Erro ao adicionar logo no PDF:", e);
+  }
+
+  doc.setTextColor(255);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(16);
+  doc.text("Moto Chefe Maringá", 40, 14);
+
+  doc.setFontSize(10);
+  doc.setTextColor(220);
+  doc.text("(44) 9 8838-1000", 40, 20);
+  doc.text("(44) 3346-1866", 40, 24);
+
+  doc.setFontSize(9);
+  doc.setTextColor(200);
+  doc.text("Av. São Paulo, 451 - Sala 01 - Centro, Maringá/PR", 40, 28);
+
+  doc.setFontSize(8);
+  doc.setTextColor(100, 180, 255);
+  doc.text("www.motochefemaringa.com.br", 40, 33);
+
+  return 47;
+}
+
+function obterJsPDF() {
+  if (window.jspdf && window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  if (window.jsPDF) return window.jsPDF;
+  return null;
+}
+
+function quebrarTextoPdf(doc, texto, larguraMax) {
+  return doc.splitTextToSize(texto, larguraMax);
+}
+
+function textoDireitaPdf(doc, texto, xRight, y) {
+  try {
+    const w = doc.getTextWidth(texto);
+    doc.text(texto, xRight - w, y);
+  } catch (e) {
+    doc.text(texto, xRight - 40, y);
+  }
+}
+
+function medirAlturaItemPedidoPdf(doc, item) {
+  const alturaHeader = 8;
+  const nomeLinhas = quebrarTextoPdf(doc, item.nome, 178);
+  let h = alturaHeader + 2 + nomeLinhas.length * 4;
+  h += item.acrescimo > 0 ? 13 : 10;
+  if (item.acrescimo > 0) h += 3.5;
+  h += 4;
+  if (item.fichaTecnica?.length) {
+    h += 4;
+    item.fichaTecnica.forEach((linha) => {
+      h += quebrarTextoPdf(doc, linha, 176).length * 3.4 + 0.5;
+    });
+    h += 2;
+  }
+  h += 3;
+  return h;
+}
+
+function desenharLinhaEntradaPedidoPdf(doc, item, x, y) {
+  const texto = item.comEntrada
+    ? `Entrada: ${formatCurrency(item.valorEntrada)}`
+    : "Sem entrada (+10% no item)";
+
+  doc.setFontSize(7);
+  doc.setFont(undefined, "normal");
+  doc.setTextColor(90);
+  doc.text(texto, x, y);
+  doc.setTextColor(20);
+  return 3.5;
+}
+
+function desenharItemProdutoPedidoPdf(doc, item, numeroItem, yInicio) {
+  const x = 10;
+  const w = 190;
+  const altura = medirAlturaItemPedidoPdf(doc, item);
+  let y = yInicio;
+
+  doc.setFillColor(252, 252, 253);
+  doc.setDrawColor(210, 212, 218);
+  doc.setLineWidth(0.25);
+  doc.rect(x, y, w, altura, "FD");
+
+  const alturaHeader = 8;
+  doc.setFillColor(28, 28, 32);
+  doc.rect(x, y, w, alturaHeader, "F");
+  doc.setTextColor(255);
+  doc.setFontSize(7.5);
+  doc.setFont(undefined, "bold");
+  doc.text(`ITEM ${numeroItem}`, x + 4, y + 5.2);
+  textoDireitaPdf(doc, formatCurrency(item.subtotalLinha), x + w - 4, y + 5.2);
+  y += alturaHeader;
+
+  doc.setTextColor(30);
+  doc.setFontSize(9);
+  doc.setFont(undefined, "bold");
+  const nomeLinhas = quebrarTextoPdf(doc, item.nome, 178);
+  nomeLinhas.forEach((ln, i) => {
+    doc.text(ln, x + 4, y + 3.5 + i * 4);
+  });
+  y += 2 + nomeLinhas.length * 4;
+
+  const tabelaY = y;
+  const tabelaH = item.acrescimo > 0 ? 13 : 10;
+  const colQtd = x + 4;
+  const colUnit = x + 36;
+  const colSubEnd = x + w - 4;
+
+  doc.setFillColor(235, 236, 240);
+  doc.rect(x + 3, tabelaY, w - 6, 4.2, "F");
+  doc.setFontSize(6.5);
+  doc.setTextColor(95);
+  doc.setFont(undefined, "bold");
+  doc.text("QTD.", colQtd + 1, tabelaY + 2.8);
+  doc.text("VALOR UNIT.", colUnit + 1, tabelaY + 2.8);
+  textoDireitaPdf(doc, "SUBTOTAL", colSubEnd, tabelaY + 2.8);
+
+  doc.setDrawColor(218, 220, 226);
+  doc.line(x + 3, tabelaY + 4.2, x + w - 3, tabelaY + 4.2);
+
+  const linhaValY = tabelaY + 8.5;
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(25);
+  doc.text(String(item.qtd), colQtd + 1, linhaValY);
+
+  if (item.acrescimo > 0) {
+    doc.setFontSize(7);
+    doc.setTextColor(120);
+    doc.text(formatCurrency(item.valorUnit), colUnit + 1, linhaValY - 0.5);
+    doc.setFontSize(8);
+    doc.setTextColor(25);
+    doc.setFont(undefined, "bold");
+    doc.text(formatCurrency(item.valorUnitEfetivo), colUnit + 1, linhaValY + 3);
+    doc.setFont(undefined, "normal");
+  } else {
+    doc.text(formatCurrency(item.valorUnitEfetivo), colUnit + 1, linhaValY);
+  }
+
+  doc.setFont(undefined, "bold");
+  textoDireitaPdf(doc, formatCurrency(item.subtotalLinha), colSubEnd, linhaValY);
+  doc.setFont(undefined, "normal");
+
+  y = tabelaY + tabelaH + 1;
+
+  if (item.acrescimo > 0) {
+    doc.setFontSize(6.5);
+    doc.setTextColor(110);
+    doc.text(
+      `Base ${formatCurrency(item.valorUnit)} × ${item.qtd} + 5% (${formatCurrency(item.acrescimo)})`,
+      x + 4,
+      y + 2
+    );
+    y += 3.5;
+  }
+
+  y += desenharLinhaEntradaPedidoPdf(doc, item, x + 4, y + 2);
+
+  if (item.fichaTecnica?.length) {
+    const fichaX = x + 4;
+    const fichaW = w - 8;
+    let fichaH = 4;
+    item.fichaTecnica.forEach((linha) => {
+      fichaH += quebrarTextoPdf(doc, linha, 176).length * 3.4 + 0.5;
+    });
+    fichaH += 2;
+
+    doc.setFillColor(246, 247, 249);
+    doc.setDrawColor(218, 220, 226);
+    doc.setLineWidth(0.2);
+    doc.rect(fichaX, y + 1, fichaW, fichaH, "FD");
+
+    let fy = y + 4;
+    doc.setFontSize(7);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(70);
+    doc.text("Ficha técnica", fichaX + 3, fy);
+    fy += 3.5;
+    doc.setFont(undefined, "normal");
+    doc.setTextColor(85);
+    item.fichaTecnica.forEach((linha) => {
+      const linhas = quebrarTextoPdf(doc, linha, 176);
+      linhas.forEach((lf, idx) => {
+        doc.text((idx === 0 ? "· " : "  ") + lf, fichaX + 3, fy);
+        fy += 3.4;
+      });
+    });
+    y += fichaH + 2;
+  }
+
+  y = yInicio + altura + 3;
+  return y;
+}
+
+function desenharResumoFinanceiroPedidoPdf(doc, dados, yInicio) {
+  const x = 10;
+  const w = 190;
+  let y = yInicio;
+  const linhas = [
+    { label: "Total do pedido", valor: formatCurrency(dados.totalPedido), destaque: false },
+    { label: "Total de entradas", valor: formatCurrency(dados.totalEntradas), destaque: false },
+    {
+      label: "Valor estimado a financiar",
+      valor: formatCurrency(dados.valorFinanciar),
+      destaque: true,
+    },
+  ];
+  const alturaBox = 7 + linhas.length * 6.5 + 4;
+
+  doc.setFillColor(28, 28, 32);
+  doc.rect(x, y, w, 7, "F");
+  doc.setTextColor(255);
+  doc.setFontSize(8);
+  doc.setFont(undefined, "bold");
+  doc.text("Resumo financeiro", x + 4, y + 4.5);
+  y += 7;
+
+  doc.setFillColor(250, 250, 251);
+  doc.setDrawColor(210, 212, 218);
+  doc.rect(x, y, w, alturaBox - 7, "FD");
+
+  linhas.forEach((ln, i) => {
+    const ly = y + 5 + i * 6.5;
+    if (i > 0) {
+      doc.setDrawColor(228, 230, 234);
+      doc.line(x + 4, ly - 2.5, x + w - 4, ly - 2.5);
+    }
+    doc.setFontSize(ln.destaque ? 9 : 8);
+    doc.setFont(undefined, ln.destaque ? "bold" : "normal");
+    doc.setTextColor(ln.destaque ? 25 : 75);
+    doc.text(ln.label, x + 5, ly);
+    doc.setTextColor(25);
+    textoDireitaPdf(doc, ln.valor, x + w - 5, ly);
+  });
+
+  return y + alturaBox - 7 + 5;
+}
+
+// Página: Pedido de Venda
+function initPedidoVenda() {
+  const container = document.getElementById("pv-produtos-container");
+  const datalist = document.getElementById("pv-produtos-datalist");
+  const btnAdd = document.getElementById("pv-btn-adicionar-produto");
+  const btnPdf = document.getElementById("pv-btn-gerar-pdf");
+  const resumoTotal = document.getElementById("pv-resumo-total");
+  const resumoEntradas = document.getElementById("pv-resumo-entradas");
+  const resumoFinanciar = document.getElementById("pv-resumo-financiar");
+
+  const catalogo = window.PRODUTOS_CATALOGO || [];
+
+  function popularDatalist() {
+    if (!datalist) return;
+    datalist.innerHTML = "";
+    catalogo.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.value = p.nome;
+      datalist.appendChild(opt);
+    });
+  }
+
+  function buscarProdutoCatalogo(texto) {
+    const t = (texto || "").trim().toLowerCase();
+    if (!t) return null;
+    const exato = catalogo.find((p) => p.nome.toLowerCase() === t);
+    if (exato) return exato;
+    return catalogo.find((p) => p.nome.toLowerCase().includes(t)) || null;
+  }
+
+  function calcularLinha(card) {
+    const qtd = parseNumber(card.querySelector(".pv-inp-qtd")?.value || "1") || 1;
+    const valorUnit = parseNumber(card.querySelector(".pv-inp-valor")?.value || "0");
+    const comEntrada = card.querySelector(".pv-chk-entrada")?.checked;
+    const valorEntrada = comEntrada
+      ? parseNumber(card.querySelector(".pv-inp-entrada-valor")?.value || "0")
+      : 0;
+
+    const subtotalBase = qtd * valorUnit;
+    const acrescimo = comEntrada ? 0 : subtotalBase * 0.05;
+    const subtotalLinha = subtotalBase + acrescimo;
+
+    const aviso = card.querySelector(".pv-acrescimo-aviso");
+    const campoEntrada = card.querySelector(".pv-campo-entrada-valor");
+    const subtotalEl = card.querySelector(".pv-subtotal-valor");
+
+    if (aviso) {
+      aviso.style.display = comEntrada ? "none" : "";
+    }
+    if (campoEntrada) {
+      campoEntrada.style.display = comEntrada ? "" : "none";
+    }
+    if (subtotalEl) {
+      subtotalEl.textContent = formatCurrency(subtotalLinha);
+    }
+
+    return {
+      qtd,
+      valorUnit,
+      comEntrada,
+      valorEntrada,
+      subtotalBase,
+      acrescimo,
+      subtotalLinha,
+    };
+  }
+
+  function atualizarFicha(card) {
+    const inp = card.querySelector(".pv-inp-produto");
+    const preview = card.querySelector(".pv-ficha-preview");
+    if (!preview || !inp) return;
+
+    const prod = buscarProdutoCatalogo(inp.value);
+    if (!prod || !prod.fichaTecnica?.length) {
+      preview.innerHTML =
+        '<span class="hint">Selecione um produto do catálogo para ver a ficha técnica.</span>';
+      return;
+    }
+
+    const itens = prod.fichaTecnica.map((l) => `<li>${l}</li>`).join("");
+    preview.innerHTML = `<strong>Ficha técnica</strong><ul>${itens}</ul>`;
+  }
+
+  function atualizarResumo() {
+    const cards = container?.querySelectorAll(".pv-produto-card") || [];
+    let totalPedido = 0;
+    let totalEntradas = 0;
+
+    cards.forEach((card) => {
+      const linha = calcularLinha(card);
+      totalPedido += linha.subtotalLinha;
+      if (linha.comEntrada) totalEntradas += linha.valorEntrada;
+    });
+
+    const financiar = Math.max(0, totalPedido - totalEntradas);
+
+    if (resumoTotal) resumoTotal.textContent = formatCurrency(totalPedido);
+    if (resumoEntradas) resumoEntradas.textContent = formatCurrency(totalEntradas);
+    if (resumoFinanciar) resumoFinanciar.textContent = formatCurrency(financiar);
+  }
+
+  function criarCardProduto() {
+    const card = document.createElement("div");
+    card.className = "pv-produto-card";
+    card.innerHTML = `
+      <div class="pv-produto-card-header">
+        <span>Item do pedido</span>
+        <button type="button" class="btn ghost pv-btn-remover" style="padding: 4px 12px; font-size: 0.8rem;">Remover</button>
+      </div>
+      <div class="field-group">
+        <label>Produto</label>
+        <input type="text" class="pv-inp-produto" list="pv-produtos-datalist" placeholder="Digite ou selecione o produto" />
+      </div>
+      <div class="pv-ficha-preview hint">Selecione um produto do catálogo para ver a ficha técnica.</div>
+      <div class="grid-2" style="margin-top: 10px;">
+        <div class="field-group">
+          <label>Quantidade</label>
+          <input type="number" class="pv-inp-qtd" min="1" value="1" />
+        </div>
+        <div class="field-group">
+          <label>Valor unitário (R$)</label>
+          <input type="number" class="pv-inp-valor" min="0" step="0.01" value="0" />
+        </div>
+      </div>
+      <label class="checkbox-row" style="margin-top: 8px;">
+        <input type="checkbox" class="pv-chk-entrada" />
+        <span>Haverá entrada?</span>
+      </label>
+      <div class="field-group pv-campo-entrada-valor pv-linha-entrada" style="display: none;">
+        <label>Valor da entrada (R$)</label>
+        <input type="number" class="pv-inp-entrada-valor" min="0" step="0.01" value="0" />
+      </div>
+      <span class="pv-acrescimo-aviso">Sem entrada: acréscimo de 10% aplicado no subtotal deste item.</span>
+      <div class="pv-subtotal-linha">Subtotal do item: <strong class="pv-subtotal-valor">R$ 0,00</strong></div>
+    `;
+
+    card.querySelector(".pv-btn-remover")?.addEventListener("click", () => {
+      if (container.querySelectorAll(".pv-produto-card").length <= 1) {
+        alert("O pedido precisa ter pelo menos um produto.");
+        return;
+      }
+      card.remove();
+      atualizarResumo();
+    });
+
+    card.addEventListener("input", () => {
+      atualizarFicha(card);
+      atualizarResumo();
+    });
+    card.addEventListener("change", () => {
+      atualizarFicha(card);
+      atualizarResumo();
+    });
+
+    const chk = card.querySelector(".pv-chk-entrada");
+    chk?.addEventListener("change", () => atualizarResumo());
+
+    return card;
+  }
+
+  function coletarDadosPedido() {
+    const cards = [...(container?.querySelectorAll(".pv-produto-card") || [])];
+    const itens = [];
+
+    cards.forEach((card) => {
+      const nome = card.querySelector(".pv-inp-produto")?.value?.trim() || "";
+      const prodCat = buscarProdutoCatalogo(nome);
+      const linha = calcularLinha(card);
+      if (!nome || linha.valorUnit <= 0) return;
+
+      itens.push({
+        nome: prodCat?.nome || nome,
+        fichaTecnica: prodCat?.fichaTecnica || [],
+        qtd: linha.qtd,
+        valorUnit: linha.valorUnit,
+        valorUnitEfetivo:
+          linha.qtd > 0 ? linha.subtotalLinha / linha.qtd : linha.valorUnit,
+        comEntrada: linha.comEntrada,
+        valorEntrada: linha.valorEntrada,
+        acrescimo: linha.acrescimo,
+        subtotalLinha: linha.subtotalLinha,
+      });
+    });
+
+    let totalPedido = 0;
+    let totalEntradas = 0;
+    itens.forEach((i) => {
+      totalPedido += i.subtotalLinha;
+      if (i.comEntrada) totalEntradas += i.valorEntrada;
+    });
+
+    return {
+      clienteNome: document.getElementById("pv-cliente-nome")?.value?.trim() || "",
+      clienteCpf: document.getElementById("pv-cliente-cpf")?.value?.trim() || "",
+      clienteContato: document.getElementById("pv-cliente-contato")?.value?.trim() || "",
+      vendedorNome: document.getElementById("pv-vendedor-nome")?.value?.trim() || "",
+      observacoes: document.getElementById("pv-observacoes")?.value?.trim() || "",
+      itens,
+      totalPedido,
+      totalEntradas,
+      valorFinanciar: Math.max(0, totalPedido - totalEntradas),
+    };
+  }
+
+  async function gerarPdfPedidoVenda() {
+    const dados = coletarDadosPedido();
+
+    if (!dados.clienteNome) {
+      alert("Informe o nome do cliente.");
+      return;
+    }
+    if (!dados.itens.length) {
+      alert("Adicione pelo menos um produto com nome e valor unitário válidos.");
+      return;
+    }
+    if (!dados.vendedorNome) {
+      alert("Informe o nome do vendedor que atendeu.");
+      return;
+    }
+
+    const jsPDFLib = obterJsPDF();
+    if (!jsPDFLib) {
+      alert(
+        "Não foi possível carregar a biblioteca de PDF (jsPDF). Verifique sua conexão e tente novamente."
+      );
+      return;
+    }
+
+    const doc = new jsPDFLib();
+    doc.setFont("helvetica", "normal");
+
+    let y = await desenharCabecalhoPdfColorido(doc);
+
+    doc.setFontSize(14);
+    doc.setTextColor(20);
+    doc.setFont(undefined, "bold");
+    doc.text("PEDIDO DE VENDA", 10, y);
+    doc.setFont(undefined, "normal");
+    y += 8;
+
+    const dataHoje = new Date().toLocaleDateString("pt-BR");
+    doc.setFontSize(10);
+    doc.text(`Data: ${dataHoje}`, 150, y - 4);
+
+    doc.setFontSize(11);
+    doc.setFont(undefined, "bold");
+    doc.text("Dados do cliente", 10, y);
+    doc.setFont(undefined, "normal");
+    y += 6;
+
+    doc.setFontSize(10);
+    doc.text(`Nome: ${dados.clienteNome}`, 10, y);
+    y += 5;
+    if (dados.clienteCpf) {
+      doc.text(`CPF: ${dados.clienteCpf}`, 10, y);
+      y += 5;
+    }
+    if (dados.clienteContato) {
+      doc.text(`Contato: ${dados.clienteContato}`, 10, y);
+      y += 5;
+    }
+
+    y += 4;
+    doc.setFontSize(11);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(20);
+    doc.text("Produtos / serviços", 10, y);
+    doc.setFont(undefined, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text(`${dados.itens.length} item(ns) neste pedido`, 10, y + 4);
+    y += 9;
+
+    const garantirEspaco = (altura) => {
+      if (y + altura > 272) {
+        doc.addPage();
+        y = 18;
+      }
+    };
+
+    dados.itens.forEach((item, index) => {
+      const alturaItem = medirAlturaItemPedidoPdf(doc, item);
+      garantirEspaco(alturaItem);
+      y = desenharItemProdutoPedidoPdf(doc, item, index + 1, y);
+    });
+
+    y += 2;
+    garantirEspaco(45);
+    y = desenharResumoFinanceiroPedidoPdf(doc, dados, y);
+    y += 4;
+
+    const algumSemEntrada = dados.itens.some((i) => !i.comEntrada);
+    const algumComEntrada = dados.itens.some((i) => i.comEntrada);
+    if (algumSemEntrada || algumComEntrada) {
+      doc.setFontSize(9);
+      doc.setTextColor(80);
+      let resumoEntrada =
+        "Condição de entrada: ";
+      if (algumComEntrada && algumSemEntrada) {
+        resumoEntrada += "itens com e sem entrada conforme detalhado acima.";
+      } else if (algumComEntrada) {
+        resumoEntrada += "há entrada informada nos itens do pedido.";
+      } else {
+        resumoEntrada +=
+          "não há entrada — acréscimo de 10% aplicado nos itens sem entrada.";
+      }
+      const linhasResumo = quebrarTextoPdf(doc, resumoEntrada, 190);
+      linhasResumo.forEach((ln) => {
+        garantirEspaco(5);
+        doc.text(ln, 10, y);
+        y += 4;
+      });
+      y += 4;
+    }
+
+    if (dados.observacoes) {
+      garantirEspaco(20);
+      doc.setFontSize(10);
+      doc.setTextColor(20);
+      doc.setFont(undefined, "bold");
+      doc.text("Observações", 10, y);
+      doc.setFont(undefined, "normal");
+      y += 5;
+      doc.setFontSize(9);
+      quebrarTextoPdf(doc, dados.observacoes, 190).forEach((ln) => {
+        garantirEspaco(5);
+        doc.text(ln, 10, y);
+        y += 4;
+      });
+      y += 6;
+    }
+
+    garantirEspaco(35);
+    y += 10;
+    const assinaturaY = Math.max(y, 240);
+    let ay = assinaturaY;
+
+    doc.setDrawColor(120);
+    doc.line(10, ay + 12, 95, ay + 12);
+    doc.line(115, ay + 12, 200, ay + 12);
+    doc.setFontSize(9);
+    doc.setTextColor(40);
+    doc.text(dados.clienteNome, 10, ay + 17);
+    doc.text("Assinatura do cliente", 10, ay + 22);
+    doc.text(dados.vendedorNome, 115, ay + 17);
+    doc.text("Vendedor / assinatura", 115, ay + 22);
+
+    const nomeArquivo = `pedido-venda-${dados.clienteNome
+      .replace(/\s+/g, "-")
+      .slice(0, 30)
+      .toLowerCase()}.pdf`;
+    doc.save(nomeArquivo);
+  }
+
+  popularDatalist();
+  if (container) {
+    container.appendChild(criarCardProduto());
+  }
+  atualizarResumo();
+
+  btnAdd?.addEventListener("click", () => {
+    container.appendChild(criarCardProduto());
+    atualizarResumo();
+  });
+
+  btnPdf?.addEventListener("click", gerarPdfPedidoVenda);
+
+  if (!window.motoChefeLogoDataUrl) {
+    obterLogoColoridaDataUrl();
+  }
+}
+
 // Bootstrap
 document.addEventListener("DOMContentLoaded", () => {
   if (document.body.id === "pagina-calculadora") {
@@ -2535,6 +3208,8 @@ document.addEventListener("DOMContentLoaded", () => {
     initOrcamento();
   } else if (document.body.id === "pagina-comparacao") {
     initComparacao();
+  } else if (document.body.id === "pagina-pedido-venda") {
+    initPedidoVenda();
   }
 });
 
