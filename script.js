@@ -2705,9 +2705,8 @@ function medirAlturaItemPedidoPdf(doc, item) {
   const alturaHeader = 8;
   const nomeLinhas = quebrarTextoPdf(doc, item.nome, 178);
   let h = alturaHeader + 2 + nomeLinhas.length * 4;
-  h += item.acrescimo > 0 ? 13 : 10;
-  if (item.acrescimo > 0) h += 3.5;
-  h += 4;
+  h += 10;
+  if (item.comEntrada) h += 4;
   if (item.fichaTecnica?.length) {
     h += 4;
     item.fichaTecnica.forEach((linha) => {
@@ -2722,21 +2721,12 @@ function medirAlturaItemPedidoPdf(doc, item) {
 const PV_ACRESCIMO_SEM_ENTRADA = 0.1;
 
 function desenharLinhaEntradaPedidoPdf(doc, item, x, y) {
-  let texto;
-  if (item.comEntrada) {
-    texto = `Entrada: ${formatCurrency(item.valorEntrada)}`;
-  } else if (item.manterValor) {
-    texto = "Sem entrada — valor informado mantido";
-  } else if (item.acrescimo > 0) {
-    texto = `Sem entrada (+10%: ${formatCurrency(item.acrescimo)})`;
-  } else {
-    texto = "Sem entrada (+10% no item)";
-  }
+  if (!item.comEntrada) return 0;
 
   doc.setFontSize(7);
   doc.setFont(undefined, "normal");
   doc.setTextColor(90);
-  doc.text(texto, x, y);
+  doc.text(`Entrada: ${formatCurrency(item.valorEntrada)}`, x, y);
   doc.setTextColor(20);
   return 3.5;
 }
@@ -2786,7 +2776,7 @@ function desenharItemProdutoPedidoPdf(
   y += 2 + nomeLinhas.length * 4;
 
   const tabelaY = y;
-  const tabelaH = item.acrescimo > 0 ? 13 : 10;
+  const tabelaH = 10;
   const colQtd = x + 4;
   const colUnit = x + 36;
   const colSubEnd = x + w - 4;
@@ -2809,36 +2799,13 @@ function desenharItemProdutoPedidoPdf(
   doc.setTextColor(25);
   doc.text(String(item.qtd), colQtd + 1, linhaValY);
 
-  if (item.acrescimo > 0) {
-    doc.setFontSize(7);
-    doc.setTextColor(120);
-    doc.text(formatCurrency(item.valorUnit), colUnit + 1, linhaValY - 0.5);
-    doc.setFontSize(8);
-    doc.setTextColor(25);
-    doc.setFont(undefined, "bold");
-    doc.text(formatCurrency(item.valorUnitEfetivo), colUnit + 1, linhaValY + 3);
-    doc.setFont(undefined, "normal");
-  } else {
-    doc.text(formatCurrency(item.valorUnitEfetivo), colUnit + 1, linhaValY);
-  }
+  doc.text(formatCurrency(item.valorUnitEfetivo), colUnit + 1, linhaValY);
 
   doc.setFont(undefined, "bold");
   textoDireitaPdf(doc, formatCurrency(item.subtotalLinha), colSubEnd, linhaValY);
   doc.setFont(undefined, "normal");
 
   y = tabelaY + tabelaH + 1;
-
-  if (item.acrescimo > 0) {
-    doc.setFontSize(6.5);
-    doc.setTextColor(110);
-    doc.text(
-      `Base ${formatCurrency(item.valorUnit)} × ${item.qtd} + 10% (${formatCurrency(item.acrescimo)})`,
-      x + 4,
-      y + 2
-    );
-    y += 3.5;
-  }
-
   y += desenharLinhaEntradaPedidoPdf(doc, item, x + 4, y + 2);
 
   if (item.fichaTecnica?.length) {
@@ -3268,39 +3235,6 @@ function initPedidoVenda() {
     garantirEspaco(45);
     y = desenharResumoFinanceiroPedidoPdf(doc, dados, y, versaoImpressao);
     y += 4;
-
-    const algumSemEntrada = dados.itens.some((i) => !i.comEntrada);
-    const algumComEntrada = dados.itens.some((i) => i.comEntrada);
-    const itensSemEntrada = dados.itens.filter((i) => !i.comEntrada);
-    const comAcrescimo10 = itensSemEntrada.filter((i) => i.acrescimo > 0);
-    const comValorMantido = itensSemEntrada.filter((i) => i.manterValor);
-
-    if (algumSemEntrada || algumComEntrada) {
-      doc.setFontSize(9);
-      doc.setTextColor(80);
-      let resumoEntrada = "Condição de entrada: ";
-      if (algumComEntrada && algumSemEntrada) {
-        resumoEntrada += "itens com e sem entrada conforme detalhado acima.";
-      } else if (algumComEntrada) {
-        resumoEntrada += "há entrada informada nos itens do pedido.";
-      } else if (comAcrescimo10.length && comValorMantido.length) {
-        resumoEntrada +=
-          "sem entrada — alguns itens com acréscimo de 10% e outros com valor informado mantido.";
-      } else if (comValorMantido.length) {
-        resumoEntrada +=
-          "sem entrada — valores informados mantidos (sem acréscimo de 10%).";
-      } else {
-        resumoEntrada +=
-          "sem entrada — acréscimo de 10% aplicado nos itens do pedido.";
-      }
-      const linhasResumo = quebrarTextoPdf(doc, resumoEntrada, 190);
-      linhasResumo.forEach((ln) => {
-        garantirEspaco(5);
-        doc.text(ln, 10, y);
-        y += 4;
-      });
-      y += 4;
-    }
 
     if (dados.observacoes) {
       garantirEspaco(20);
