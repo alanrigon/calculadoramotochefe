@@ -67,7 +67,8 @@
           <p class="hint catalogo-hint">
             Produtos vêm do arquivo
             <strong>produtos-catalogo.js</strong>. Digite na caixa para filtrar ou escolha na
-            lista. Sem entrada no produto, o valor recebe <strong>+5%</strong> automaticamente.
+            lista. Sem entrada, o valor recebe <strong>+10%</strong> automaticamente, ou marque
+            <strong>Manter valor informado</strong> para usar o preço digitado.
           </p>
           <datalist id="pv-produtos-datalist"></datalist>
           <div id="pv-produtos-container" class="pv-produtos-container"></div>
@@ -96,6 +97,9 @@
           </small>
           <button type="button" class="btn primary full" id="pv-btn-gerar-pdf" style="margin-top: 14px;">
             📥 Gerar PDF (colorido)
+          </button>
+          <button type="button" class="btn ghost full" id="pv-btn-gerar-pdf-impressao">
+            🖨️ PDF para impressão (economia de tinta)
           </button>
         </section>
 

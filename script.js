@@ -2578,6 +2578,41 @@ async function obterLogoColoridaDataUrl() {
   });
 }
 
+function carregarLogoBrancaDataUrl() {
+  return new Promise((resolve) => {
+    if (window.motoChefeLogoBrancaDataUrl) {
+      resolve(window.motoChefeLogoBrancaDataUrl);
+      return;
+    }
+
+    const logoBrancaSrc = "LOGO MC - BRANCA .png";
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        window.motoChefeLogoBrancaDataUrl = canvas.toDataURL("image/png");
+        resolve(window.motoChefeLogoBrancaDataUrl);
+      } catch (e) {
+        console.error("Erro ao preparar logo branca para PDF:", e);
+        resolve(null);
+      }
+    };
+
+    img.onerror = () => {
+      console.warn("Não foi possível carregar a logo branca para o PDF.");
+      resolve(null);
+    };
+
+    img.src = logoBrancaSrc;
+  });
+}
+
 async function desenharCabecalhoPdfColorido(doc) {
   doc.setFillColor(20, 20, 22);
   doc.rect(0, 0, 210, 38, "F");
@@ -2607,6 +2642,41 @@ async function desenharCabecalhoPdfColorido(doc) {
 
   doc.setFontSize(8);
   doc.setTextColor(100, 180, 255);
+  doc.text("www.motochefemaringa.com.br", 40, 33);
+
+  return 47;
+}
+
+async function desenharCabecalhoPdfImpressaoPedido(doc) {
+  doc.setDrawColor(100, 100, 100);
+  doc.setLineWidth(0.5);
+  doc.rect(5, 5, 200, 33);
+
+  try {
+    const logoDataUrl = await carregarLogoBrancaDataUrl();
+    if (logoDataUrl) {
+      doc.addImage(logoDataUrl, "PNG", 10, 8, 26, 20);
+    }
+  } catch (e) {
+    console.error("Erro ao adicionar logo no PDF de impressão:", e);
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(20);
+  doc.setFontSize(16);
+  doc.text("Moto Chefe Maringá", 40, 14);
+
+  doc.setFontSize(10);
+  doc.setTextColor(60);
+  doc.text("(44) 9 8838-1000", 40, 20);
+  doc.text("(44) 3346-1866", 40, 24);
+
+  doc.setFontSize(9);
+  doc.setTextColor(80);
+  doc.text("Av. São Paulo, 451 - Sala 01 - Centro, Maringá/PR", 40, 28);
+
+  doc.setFontSize(8);
+  doc.setTextColor(0, 100, 180);
   doc.text("www.motochefemaringa.com.br", 40, 33);
 
   return 47;
@@ -2649,10 +2719,19 @@ function medirAlturaItemPedidoPdf(doc, item) {
   return h;
 }
 
+const PV_ACRESCIMO_SEM_ENTRADA = 0.1;
+
 function desenharLinhaEntradaPedidoPdf(doc, item, x, y) {
-  const texto = item.comEntrada
-    ? `Entrada: ${formatCurrency(item.valorEntrada)}`
-    : "Sem entrada (+10% no item)";
+  let texto;
+  if (item.comEntrada) {
+    texto = `Entrada: ${formatCurrency(item.valorEntrada)}`;
+  } else if (item.manterValor) {
+    texto = "Sem entrada — valor informado mantido";
+  } else if (item.acrescimo > 0) {
+    texto = `Sem entrada (+10%: ${formatCurrency(item.acrescimo)})`;
+  } else {
+    texto = "Sem entrada (+10% no item)";
+  }
 
   doc.setFontSize(7);
   doc.setFont(undefined, "normal");
@@ -2662,7 +2741,13 @@ function desenharLinhaEntradaPedidoPdf(doc, item, x, y) {
   return 3.5;
 }
 
-function desenharItemProdutoPedidoPdf(doc, item, numeroItem, yInicio) {
+function desenharItemProdutoPedidoPdf(
+  doc,
+  item,
+  numeroItem,
+  yInicio,
+  versaoImpressao = false
+) {
   const x = 10;
   const w = 190;
   const altura = medirAlturaItemPedidoPdf(doc, item);
@@ -2674,9 +2759,17 @@ function desenharItemProdutoPedidoPdf(doc, item, numeroItem, yInicio) {
   doc.rect(x, y, w, altura, "FD");
 
   const alturaHeader = 8;
-  doc.setFillColor(28, 28, 32);
-  doc.rect(x, y, w, alturaHeader, "F");
-  doc.setTextColor(255);
+  if (versaoImpressao) {
+    doc.setFillColor(230, 232, 236);
+    doc.rect(x, y, w, alturaHeader, "F");
+    doc.setDrawColor(200, 204, 210);
+    doc.line(x, y + alturaHeader, x + w, y + alturaHeader);
+    doc.setTextColor(30);
+  } else {
+    doc.setFillColor(28, 28, 32);
+    doc.rect(x, y, w, alturaHeader, "F");
+    doc.setTextColor(255);
+  }
   doc.setFontSize(7.5);
   doc.setFont(undefined, "bold");
   doc.text(`ITEM ${numeroItem}`, x + 4, y + 5.2);
@@ -2739,7 +2832,7 @@ function desenharItemProdutoPedidoPdf(doc, item, numeroItem, yInicio) {
     doc.setFontSize(6.5);
     doc.setTextColor(110);
     doc.text(
-      `Base ${formatCurrency(item.valorUnit)} × ${item.qtd} + 5% (${formatCurrency(item.acrescimo)})`,
+      `Base ${formatCurrency(item.valorUnit)} × ${item.qtd} + 10% (${formatCurrency(item.acrescimo)})`,
       x + 4,
       y + 2
     );
@@ -2784,7 +2877,12 @@ function desenharItemProdutoPedidoPdf(doc, item, numeroItem, yInicio) {
   return y;
 }
 
-function desenharResumoFinanceiroPedidoPdf(doc, dados, yInicio) {
+function desenharResumoFinanceiroPedidoPdf(
+  doc,
+  dados,
+  yInicio,
+  versaoImpressao = false
+) {
   const x = 10;
   const w = 190;
   let y = yInicio;
@@ -2799,9 +2897,16 @@ function desenharResumoFinanceiroPedidoPdf(doc, dados, yInicio) {
   ];
   const alturaBox = 7 + linhas.length * 6.5 + 4;
 
-  doc.setFillColor(28, 28, 32);
-  doc.rect(x, y, w, 7, "F");
-  doc.setTextColor(255);
+  if (versaoImpressao) {
+    doc.setFillColor(230, 232, 236);
+    doc.setDrawColor(200, 204, 210);
+    doc.rect(x, y, w, 7, "FD");
+    doc.setTextColor(30);
+  } else {
+    doc.setFillColor(28, 28, 32);
+    doc.rect(x, y, w, 7, "F");
+    doc.setTextColor(255);
+  }
   doc.setFontSize(8);
   doc.setFont(undefined, "bold");
   doc.text("Resumo financeiro", x + 4, y + 4.5);
@@ -2834,6 +2939,7 @@ function initPedidoVenda() {
   const datalist = document.getElementById("pv-produtos-datalist");
   const btnAdd = document.getElementById("pv-btn-adicionar-produto");
   const btnPdf = document.getElementById("pv-btn-gerar-pdf");
+  const btnPdfImpressao = document.getElementById("pv-btn-gerar-pdf-impressao");
   const resumoTotal = document.getElementById("pv-resumo-total");
   const resumoEntradas = document.getElementById("pv-resumo-entradas");
   const resumoFinanciar = document.getElementById("pv-resumo-financiar");
@@ -2858,28 +2964,47 @@ function initPedidoVenda() {
     return catalogo.find((p) => p.nome.toLowerCase().includes(t)) || null;
   }
 
+  function atualizarUiOpcoesPedido(card, { comEntrada, manterValor, aplicarAcrescimo }) {
+    const campoEntrada = card.querySelector(".pv-campo-entrada-valor");
+    const opcoesSemEntrada = card.querySelector(".pv-opcoes-sem-entrada");
+    const aviso = card.querySelector(".pv-acrescimo-aviso");
+    const chkManter = card.querySelector(".pv-chk-manter-valor");
+
+    if (campoEntrada) {
+      campoEntrada.style.display = comEntrada ? "" : "none";
+    }
+    if (opcoesSemEntrada) {
+      opcoesSemEntrada.style.display = comEntrada ? "none" : "";
+    }
+    if (aviso) {
+      aviso.style.display = aplicarAcrescimo ? "" : "none";
+    }
+    if (chkManter) {
+      chkManter.disabled = comEntrada;
+      if (comEntrada) chkManter.checked = false;
+    }
+  }
+
   function calcularLinha(card) {
     const qtd = parseNumber(card.querySelector(".pv-inp-qtd")?.value || "1") || 1;
     const valorUnit = parseNumber(card.querySelector(".pv-inp-valor")?.value || "0");
     const comEntrada = card.querySelector(".pv-chk-entrada")?.checked;
+    const manterValor =
+      !comEntrada && card.querySelector(".pv-chk-manter-valor")?.checked;
     const valorEntrada = comEntrada
       ? parseNumber(card.querySelector(".pv-inp-entrada-valor")?.value || "0")
       : 0;
 
     const subtotalBase = qtd * valorUnit;
-    const acrescimo = comEntrada ? 0 : subtotalBase * 0.05;
+    const aplicarAcrescimo = !comEntrada && !manterValor;
+    const acrescimo = aplicarAcrescimo
+      ? subtotalBase * PV_ACRESCIMO_SEM_ENTRADA
+      : 0;
     const subtotalLinha = subtotalBase + acrescimo;
 
-    const aviso = card.querySelector(".pv-acrescimo-aviso");
-    const campoEntrada = card.querySelector(".pv-campo-entrada-valor");
-    const subtotalEl = card.querySelector(".pv-subtotal-valor");
+    atualizarUiOpcoesPedido(card, { comEntrada, manterValor, aplicarAcrescimo });
 
-    if (aviso) {
-      aviso.style.display = comEntrada ? "none" : "";
-    }
-    if (campoEntrada) {
-      campoEntrada.style.display = comEntrada ? "" : "none";
-    }
+    const subtotalEl = card.querySelector(".pv-subtotal-valor");
     if (subtotalEl) {
       subtotalEl.textContent = formatCurrency(subtotalLinha);
     }
@@ -2888,10 +3013,12 @@ function initPedidoVenda() {
       qtd,
       valorUnit,
       comEntrada,
+      manterValor,
       valorEntrada,
       subtotalBase,
       acrescimo,
       subtotalLinha,
+      aplicarAcrescimo,
     };
   }
 
@@ -2960,7 +3087,13 @@ function initPedidoVenda() {
         <label>Valor da entrada (R$)</label>
         <input type="number" class="pv-inp-entrada-valor" min="0" step="0.01" value="0" />
       </div>
-      <span class="pv-acrescimo-aviso">Sem entrada: acréscimo de 10% aplicado no subtotal deste item.</span>
+      <div class="pv-opcoes-sem-entrada">
+        <label class="checkbox-row pv-linha-manter-valor">
+          <input type="checkbox" class="pv-chk-manter-valor" />
+          <span>Manter valor informado (sem acréscimo de 10%)</span>
+        </label>
+        <span class="pv-acrescimo-aviso">Sem entrada: acréscimo de 10% aplicado no subtotal deste item.</span>
+      </div>
       <div class="pv-subtotal-linha">Subtotal do item: <strong class="pv-subtotal-valor">R$ 0,00</strong></div>
     `;
 
@@ -2982,8 +3115,16 @@ function initPedidoVenda() {
       atualizarResumo();
     });
 
-    const chk = card.querySelector(".pv-chk-entrada");
-    chk?.addEventListener("change", () => atualizarResumo());
+    const chkEntrada = card.querySelector(".pv-chk-entrada");
+    const chkManter = card.querySelector(".pv-chk-manter-valor");
+
+    chkEntrada?.addEventListener("change", () => {
+      if (chkEntrada.checked && chkManter) {
+        chkManter.checked = false;
+      }
+      atualizarResumo();
+    });
+    chkManter?.addEventListener("change", () => atualizarResumo());
 
     return card;
   }
@@ -3006,6 +3147,7 @@ function initPedidoVenda() {
         valorUnitEfetivo:
           linha.qtd > 0 ? linha.subtotalLinha / linha.qtd : linha.valorUnit,
         comEntrada: linha.comEntrada,
+        manterValor: linha.manterValor,
         valorEntrada: linha.valorEntrada,
         acrescimo: linha.acrescimo,
         subtotalLinha: linha.subtotalLinha,
@@ -3032,7 +3174,7 @@ function initPedidoVenda() {
     };
   }
 
-  async function gerarPdfPedidoVenda() {
+  async function gerarPdfPedidoVenda(versaoImpressao = false) {
     const dados = coletarDadosPedido();
 
     if (!dados.clienteNome) {
@@ -3059,7 +3201,9 @@ function initPedidoVenda() {
     const doc = new jsPDFLib();
     doc.setFont("helvetica", "normal");
 
-    let y = await desenharCabecalhoPdfColorido(doc);
+    let y = versaoImpressao
+      ? await desenharCabecalhoPdfImpressaoPedido(doc)
+      : await desenharCabecalhoPdfColorido(doc);
 
     doc.setFontSize(14);
     doc.setTextColor(20);
@@ -3111,28 +3255,43 @@ function initPedidoVenda() {
     dados.itens.forEach((item, index) => {
       const alturaItem = medirAlturaItemPedidoPdf(doc, item);
       garantirEspaco(alturaItem);
-      y = desenharItemProdutoPedidoPdf(doc, item, index + 1, y);
+      y = desenharItemProdutoPedidoPdf(
+        doc,
+        item,
+        index + 1,
+        y,
+        versaoImpressao
+      );
     });
 
     y += 2;
     garantirEspaco(45);
-    y = desenharResumoFinanceiroPedidoPdf(doc, dados, y);
+    y = desenharResumoFinanceiroPedidoPdf(doc, dados, y, versaoImpressao);
     y += 4;
 
     const algumSemEntrada = dados.itens.some((i) => !i.comEntrada);
     const algumComEntrada = dados.itens.some((i) => i.comEntrada);
+    const itensSemEntrada = dados.itens.filter((i) => !i.comEntrada);
+    const comAcrescimo10 = itensSemEntrada.filter((i) => i.acrescimo > 0);
+    const comValorMantido = itensSemEntrada.filter((i) => i.manterValor);
+
     if (algumSemEntrada || algumComEntrada) {
       doc.setFontSize(9);
       doc.setTextColor(80);
-      let resumoEntrada =
-        "Condição de entrada: ";
+      let resumoEntrada = "Condição de entrada: ";
       if (algumComEntrada && algumSemEntrada) {
         resumoEntrada += "itens com e sem entrada conforme detalhado acima.";
       } else if (algumComEntrada) {
         resumoEntrada += "há entrada informada nos itens do pedido.";
+      } else if (comAcrescimo10.length && comValorMantido.length) {
+        resumoEntrada +=
+          "sem entrada — alguns itens com acréscimo de 10% e outros com valor informado mantido.";
+      } else if (comValorMantido.length) {
+        resumoEntrada +=
+          "sem entrada — valores informados mantidos (sem acréscimo de 10%).";
       } else {
         resumoEntrada +=
-          "não há entrada — acréscimo de 10% aplicado nos itens sem entrada.";
+          "sem entrada — acréscimo de 10% aplicado nos itens do pedido.";
       }
       const linhasResumo = quebrarTextoPdf(doc, resumoEntrada, 190);
       linhasResumo.forEach((ln) => {
@@ -3175,7 +3334,8 @@ function initPedidoVenda() {
     doc.text(dados.vendedorNome, 115, ay + 17);
     doc.text("Vendedor / assinatura", 115, ay + 22);
 
-    const nomeArquivo = `pedido-venda-${dados.clienteNome
+    const sufixo = versaoImpressao ? "-impressao" : "";
+    const nomeArquivo = `pedido-venda${sufixo}-${dados.clienteNome
       .replace(/\s+/g, "-")
       .slice(0, 30)
       .toLowerCase()}.pdf`;
@@ -3193,11 +3353,13 @@ function initPedidoVenda() {
     atualizarResumo();
   });
 
-  btnPdf?.addEventListener("click", gerarPdfPedidoVenda);
+  btnPdf?.addEventListener("click", () => gerarPdfPedidoVenda(false));
+  btnPdfImpressao?.addEventListener("click", () => gerarPdfPedidoVenda(true));
 
   if (!window.motoChefeLogoDataUrl) {
     obterLogoColoridaDataUrl();
   }
+  carregarLogoBrancaDataUrl();
 }
 
 // Bootstrap
