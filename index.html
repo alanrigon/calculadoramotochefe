@@ -120,7 +120,19 @@
               </small>
             </div>
           </div>
-
+<section class="card">
+          <h3>Frete</h3>
+          <label class="checkbox-row" style="margin-top: 8px;">
+            <input type="checkbox" id="pv-chk-frete" />
+            <span>Há frete?</span>
+          </label>
+          <div class="field-group pv-campo-frete-valor" id="pv-grupo-frete-valor" style="display: none; margin-top: 10px;">
+            <label for="pv-inp-frete-valor">Valor do frete (R$)</label>
+            <input type="number" id="pv-inp-frete-valor" min="0" step="0.01" value="0" />
+          </div>
+        </section>
+        <section class="card">
+          <!-- (seu código de resumo existente abaixo) -->
           <div>
             <h3>Resumo</h3>
             <div class="resumo-linha">
