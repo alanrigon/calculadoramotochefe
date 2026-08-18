@@ -134,6 +134,17 @@ window.PRODUTOS_CATALOGO = [
   },
 
   {
+    id: "RET",
+    nome: "Autopropelido RET 1000W",
+    fichaTecnica: [
+      "Motor: 1000W",
+      "Configuração: Autopropelido",
+      "Não necessita CNH",
+      "Autonomia de até 45km"
+    ]
+  },
+
+    {
     id: "MIA-TRI-800W",
     nome: "Triciclo Elétrico MIA TRI 800W",
     fichaTecnica: [
@@ -143,7 +154,16 @@ window.PRODUTOS_CATALOGO = [
       "Autonomia de até 45km"
     ]
   },
-
+    {
+    id: "X15",
+    nome: "Triciclo Elétrico X15 3000W",
+    fichaTecnica: [
+      "Motor: 3000W",
+      "Configuração: Triciclo",
+      "Velocidade Máxima: 75km/h",
+      "Autonomia de até 40-45km"
+    ]
+  },
   {
     id: "BIG-TRI-1000W",
     nome: "Triciclo Elétrico BIG TRI 1000W",
