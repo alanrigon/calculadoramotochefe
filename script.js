@@ -2853,7 +2853,16 @@ function desenharResumoFinanceiroPedidoPdf(
   const x = 10;
   const w = 190;
   let y = yInicio;
+  const subtotalItens = dados.totalPedido - (dados.temFrete ? dados.valorFrete : 0);
   const linhas = [
+    { label: "Subtotal dos produtos", valor: formatCurrency(subtotalItens), destaque: false },
+  ];
+
+  if (dados.temFrete && dados.valorFrete > 0) {
+    linhas.push({ label: "Frete", valor: formatCurrency(dados.valorFrete), destaque: false });
+  }
+
+  linhas.push(
     { label: "Total do pedido", valor: formatCurrency(dados.totalPedido), destaque: false },
     { label: "Total de entradas", valor: formatCurrency(dados.totalEntradas), destaque: false },
     {
@@ -2861,7 +2870,7 @@ function desenharResumoFinanceiroPedidoPdf(
       valor: formatCurrency(dados.valorFinanciar),
       destaque: true,
     },
-  ];
+  );
   const alturaBox = 7 + linhas.length * 6.5 + 4;
 
   if (versaoImpressao) {
@@ -2911,7 +2920,25 @@ function initPedidoVenda() {
   const resumoEntradas = document.getElementById("pv-resumo-entradas");
   const resumoFinanciar = document.getElementById("pv-resumo-financiar");
 
+  // Elementos de frete
+  const chkFrete = document.getElementById("pv-chk-frete");
+  const grupoFreteValor = document.getElementById("pv-grupo-frete-valor");
+  const inpFreteValor = document.getElementById("pv-inp-frete-valor");
+
   const catalogo = window.PRODUTOS_CATALOGO || [];
+
+  // Controle de visibilidade do campo de frete
+  chkFrete?.addEventListener("change", () => {
+    if (grupoFreteValor) {
+      grupoFreteValor.style.display = chkFrete.checked ? "" : "none";
+    }
+    if (!chkFrete.checked && inpFreteValor) {
+      inpFreteValor.value = "0";
+    }
+    atualizarResumo();
+  });
+
+  inpFreteValor?.addEventListener("input", atualizarResumo);
 
   function popularDatalist() {
     if (!datalist) return;
@@ -3015,6 +3042,11 @@ function initPedidoVenda() {
       totalPedido += linha.subtotalLinha;
       if (linha.comEntrada) totalEntradas += linha.valorEntrada;
     });
+
+    // Somar frete se marcado
+    const temFrete = chkFrete?.checked || false;
+    const valorFrete = temFrete ? parseNumber(inpFreteValor?.value || "0") : 0;
+    totalPedido += valorFrete;
 
     const financiar = Math.max(0, totalPedido - totalEntradas);
 
@@ -3121,12 +3153,16 @@ function initPedidoVenda() {
       });
     });
 
-    let totalPedido = 0;
+    let totalProdutos = 0;
     let totalEntradas = 0;
     itens.forEach((i) => {
-      totalPedido += i.subtotalLinha;
+      totalProdutos += i.subtotalLinha;
       if (i.comEntrada) totalEntradas += i.valorEntrada;
     });
+
+    const temFrete = chkFrete?.checked || false;
+    const valorFrete = temFrete ? parseNumber(inpFreteValor?.value || "0") : 0;
+    const totalPedido = totalProdutos + valorFrete;
 
     return {
       clienteNome: document.getElementById("pv-cliente-nome")?.value?.trim() || "",
@@ -3135,6 +3171,8 @@ function initPedidoVenda() {
       vendedorNome: document.getElementById("pv-vendedor-nome")?.value?.trim() || "",
       observacoes: document.getElementById("pv-observacoes")?.value?.trim() || "",
       itens,
+      temFrete,
+      valorFrete,
       totalPedido,
       totalEntradas,
       valorFinanciar: Math.max(0, totalPedido - totalEntradas),
@@ -3308,5 +3346,3 @@ document.addEventListener("DOMContentLoaded", () => {
     initPedidoVenda();
   }
 });
-
-
